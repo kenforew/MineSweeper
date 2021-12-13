@@ -1,0 +1,22 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+C:/Users/kenforew/cppcode/main.cpp
+iostream
+-
+math.h
+-
+random
+-
+vector
+-
+algorithm
+-
+opencv2/opencv.hpp
+-
+
