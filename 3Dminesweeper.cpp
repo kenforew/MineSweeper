@@ -1,10 +1,8 @@
 #include <iostream>
 #include <string>
-#include <typeinfo>
 #include <math.h>
 #include <random>
 #include <vector>
-#include <algorithm>
 
 #include <opencv2/opencv.hpp>
 
@@ -15,6 +13,8 @@ using namespace std;
 
 int mouseDownX=0;
 int mouseDownY=0;
+int mouseEscapeX=0;
+int mouseEscapeY=0;
 int mouseUpdateX=0;
 int mouseUpdateY=0;
 int mouseUpX=0;
@@ -91,7 +91,6 @@ public:
         dx=z*sin(rotY)+x*cos(rotY);
         z=dz;
         x=dx;
-        //std::cout<<"rotation is called. x,y,z="<<x<<", "<<y<<", "<<z<<endl;
     }
 };
 
@@ -214,7 +213,6 @@ int flagCounter(){
             }
         }
     }
-    //std::cout<<"flag : "<<x<<endl;
     return x;
 }
 
@@ -276,15 +274,11 @@ void modeChange(int m){
         default:
             break;
     }
-
     
     gameInitialize();
 }
 
 cv::Scalar cellColor(int x){
-    if(x==0){
-        return cv::Scalar(0xff,0xaa,0xaa);
-    }else{
         int R=0,G=0,B=0;
         
         if(x%3==0){
@@ -316,17 +310,7 @@ cv::Scalar cellColor(int x){
             B=0xff;
         }
 
-        if(x==1){
-            R=0xff,G=0x00,B=0x00;
-        }else if(x==2){
-            R=0x00,G=0xff,B=0x00;
-        }else if(x==3){
-            R=0x00,G=0x00,B=0xff;
-        }else{
-            R=0xff,G=0xff,B=0xff;
-        }
         return cv::Scalar(B,G,R);
-    }
 }
 
 void gameClearJudge(){
@@ -407,15 +391,15 @@ void boardInitialize(){
     }
 }
 
+std::default_random_engine generator;
+std::uniform_int_distribution<int> distribution(0,boardX*boardY*boardZ-1);
+
 void dangerInitialize(){
     vector<int> mineIndex;
     bool newIntFlag=true;
-    random_device rd;
-    mt19937 gen(rd());
-    uniform_int_distribution<> distr(0,boardX*boardY*boardZ-1);
+            
     while(mineIndex.size()<mines){
-        int rand=distr(gen);
-        //std::cout<<"random:"<<rand<<endl;
+        int rand=distribution(generator);
         newIntFlag=true;
         for(int i=0;i<mineIndex.size();i++){
             if(mineIndex[i]==rand){
@@ -434,6 +418,7 @@ void dangerInitialize(){
         int z=mineIndex[i]%boardZ;
         danger[x][y][z]=true;
     }
+
 }
 
 void safechain(int x,int y,int z){
@@ -480,7 +465,7 @@ bool safe(int x,int y,int z){
     for(int i=0;i<3;i++){
         for(int j=0;j<3;j++){
             for(int k=0;k<3;k++){
-                if(!(i==0&&j==0&&k==0)){
+                if(!(i==1&&j==1&&k==1)){
                     result=result&&safe2(x,y,z,i-1,j-1,k-1);
                 }
             }
@@ -508,8 +493,8 @@ int count(int x,int y,int z){
     for(int i=0;i<3;i++){
         for(int j=0;j<3;j++){
             for(int k=0;k<3;k++){
-                if(!(i==0&&j==0&&k==0)){
-                    sum+=count2(x,y,z,i-1,j-1,k-1);
+                if(!(i==1&&j==1&&k==1)){
+                    sum=sum+count2(x,y,z,i-1,j-1,k-1);
                 }
             }
         }
@@ -533,6 +518,8 @@ void mouse_callback(int event,int x,int y,int flags,void *userdata)
     if(event==cv::EVENT_LBUTTONDOWN){
         mouseDownX=x;
         mouseDownY=y;
+        mouseEscapeX=x;
+        mouseEscapeY=y;
         mouseDownFlag=true;
         leftClickFlag=true;
         longPressFlag=false;
@@ -551,15 +538,15 @@ void mouse_callback(int event,int x,int y,int flags,void *userdata)
                 cz=cursor[2];
                 if(visual[cx][cy][cz]!=-1){
                     demined[cx][cy][cz]=true;
-                    if(danger[cx][cy][cz]){
+                    if(danger[cx][cy][cz]){//bomb
                         mainlist[cx*boardY*boardZ+cy*boardZ+cz].setlabel("b");
                         gameover=true;
-                    }else if(safe(cx,cy,cz)){
+                    }else if(safe(cx,cy,cz)){//no mine around
                         visual[cx][cy][cz]=0;
                         mainlist[cx*boardY*boardZ+cy*boardZ+cz].setlabel("");
-                        mainlist[cx*boardY*boardZ+cy*boardZ+cz].setcolor(visual[cx][cy][cz]);
+                        mainlist[cx*boardY*boardZ+cy*boardZ+cz].setcolor(cellColor(visual[cx][cy][cz]));
                         safechain(cx,cy,cz);
-                    }else{
+                    }else{//some mine around
                         visual[cx][cy][cz]=count(cx,cy,cz);
                         mainlist[cx*boardY*boardZ+cy*boardZ+cz].setlabel(to_string(visual[cx][cy][cz]));
                         mainlist[cx*boardY*boardZ+cy*boardZ+cz].setcolor(cellColor(visual[cx][cy][cz]));
@@ -587,10 +574,8 @@ void mouse_callback(int event,int x,int y,int flags,void *userdata)
                     cursor[2]=(cursor[2]-1)%boardZ;
                     while(cursor[2]<0)cursor[2]=cursor[2]+boardZ;
                 }
-            }
- 
+            } 
         }
-        longPressFlag=true;
     }
     if(event==cv::EVENT_RBUTTONDOWN){
         mouseDownFlag=true;
@@ -620,11 +605,18 @@ void mouse_callback(int event,int x,int y,int flags,void *userdata)
     if(event==cv::EVENT_MOUSEMOVE){
         mouseUpdateX=x;
         mouseUpdateY=y;
-        longPressFlag=true;
-        if(mouseDownFlag){
+        
+        double xd,yd,ld;
+        xd=x-mouseDownX;
+        yd=y-mouseDownY;
+        ld=sqrt(xd*xd+yd*yd);
+        if(ld>10){
+            longPressFlag=true;
+        }
+        if(mouseDownFlag&&longPressFlag){
             double rotZ,rotY;
-            rotZ=(mouseUpdateX-mouseDownX)/6000.0;
-            rotY=(mouseUpdateY-mouseDownY)/6000.0;
+            rotZ=(mouseUpdateX-mouseEscapeX)/300.0;
+            rotY=(mouseUpdateY-mouseEscapeY)/300.0;
             for(int i=0;i<boardX*boardY*boardZ;i++){
                 mainlist[i].rotation(rotZ,rotY);
             }
@@ -632,17 +624,14 @@ void mouse_callback(int event,int x,int y,int flags,void *userdata)
                 controllerlist[i].rotation(rotZ,rotY);
             }
         }
+        mouseEscapeX=x;
+        mouseEscapeY=y;
     }
-
 }
-int gdcounter=0;
 
 void gameDisplay()
 {
-    gdcounter++;
-    //if(gdcounter%100==0){
-        std::cout<<"frame order : "<<gdcounter<<endl;
-    //}
+    for(int gumi=0;true;){
     
     cv::Mat img(cv::Size(CANVAS_WIDTH,2*CANVAS_HEIGHT),CV_8UC3,cv::Scalar(0,0,0));
     
@@ -652,13 +641,16 @@ void gameDisplay()
     putText(img,"H:Hard",cv::Point(10,130),1,1.2,cv::Scalar(0xfe,0xfe,0xfe));
     putText(img,"Flag : "+to_string(flagCounter()),cv::Point(10,200),1,1.2,cv::Scalar(0xfe,0xfe,0xfe));
     putText(img,"Time : "+to_string(timeCounter()),cv::Point(10,230),1,1.2,cv::Scalar(0xfe,0xfe,0xfe));
+    
+    vector<Cell> sortlist;
+    copy(mainlist.begin(),mainlist.end(),back_inserter(sortlist));
 
     for(int i=0;i<boardX*boardY*boardZ;i++){
         for(int j=i+1;j<boardX*boardY*boardZ;j++){
-            if(mainlist[i].getx()>mainlist[j].getx()){
-                Cell t=mainlist[i];
-                mainlist[i]=mainlist[j];
-                mainlist[j]=t;
+            if(sortlist[i].getx()>sortlist[j].getx()){
+                Cell t=sortlist[i];
+                sortlist[i]=sortlist[j];
+                sortlist[j]=t;
             }
         }
     }
@@ -666,9 +658,9 @@ void gameDisplay()
     for(int i=0;i<boardX*boardY*boardZ;i++){
 	    double fy,fz,fr;
         int oy,oz,size;
-        fy=mainlist[i].gety();
-        fz=mainlist[i].getz();
-        fr=1+mainlist[i].getx()/300;
+        fy=sortlist[i].gety();
+        fz=sortlist[i].getz();
+        fr=1+sortlist[i].getx()/300;
         oy=CANVAS_WIDTH/2;
         oz=CANVAS_HEIGHT/2;
         size=cellsize;
@@ -679,11 +671,11 @@ void gameDisplay()
             cv::Scalar cellcolor;
             bool onCursor;
 
-            vx=mainlist[i].getvx();
-            vy=mainlist[i].getvy();
-            vz=mainlist[i].getvz();
-            cellcolor=mainlist[i].getcolor();
-
+            vx=sortlist[i].getvx();
+            vy=sortlist[i].getvy();
+            vz=sortlist[i].getvz();
+            cellcolor=sortlist[i].getcolor();
+            
             onCursor=(cursor[0]==vx)&&(cursor[1]==vy)&&(cursor[2]==vz);
 
             if(onCursor){
@@ -695,8 +687,6 @@ void gameDisplay()
                     int B=fr*10*10+22;
 
                     cellcolor=cv::Scalar(B,G,R);
-                }else{
-                    cellcolor=mainlist[i].getcolor();
                 }
             }
 
@@ -718,8 +708,12 @@ void gameDisplay()
             }
 
             if(!(demined[vx][vy][vz]&&visual[vx][vy][vz]==0)||onCursor){
+                
                 circle(img,cv::Point(fy*fr+oy,fz*fr+oz),size*fr,cellcolor,-1);            
-                putText(img,celltext,cv::Point(fy*fr+oy,fz*fr+oz),1,0.8,cv::Scalar(200,200,0));
+                circle(img,cv::Point(fy*fr+oy,fz*fr+oz),size*fr,cv::Scalar(0xff,0xff,0xff),1);
+                
+                putText(img,celltext,cv::Point(fy*fr+oy,fz*fr+oz),1,0.8,cv::Scalar(20,20,20));
+                
                 if(gameclear){
                     putText(img,"GAME CLEAR",cv::Point(CANVAS_WIDTH/2,CANVAS_HEIGHT/2),1,3.0,cv::Scalar(100,100,100));
                 }else if(gameover){
@@ -784,12 +778,11 @@ void gameDisplay()
     imshow("3Dminesweeper", img);    
     
     canvas=img;
-    //cv::Mat xyz(cv::Size(3,3),CV_8UC3,cv::Scalar(40,19,90));
     cv::setMouseCallback("3Dminesweeper",mouse_callback,&img);
     
     img.cv::Mat::release();
 
-    switch(cv::waitKey(10)){
+    switch(cv::waitKey(100)){
         case 101:
             modeChange(0);
             break;
@@ -806,13 +799,11 @@ void gameDisplay()
             break;
     }
 
-    gameDisplay();
+}
 }
 
 int main( int argc, char** argv )
 {
-    //cv::namedWindow("3Dminesweeper",CV_WINDOW_AUTOSIZE|CV_WINDOW_FREERATIO);
     gameInitialize();
-
     return 0;
 }
