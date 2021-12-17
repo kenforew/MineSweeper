@@ -116,14 +116,125 @@ void mandelbrot(){
     std::cout<<"roop is over."<<endl;
     imshow("mandelbrot",img);
     //img.cv::Mat::release();
-    cv::waitKey(60);
+    cv::waitKey(160);
     zoom++;
     counter+=5;
     mandelbrot();
 }
 
+void julia(){
+    cv::Mat img(cv::Size(CANVAS_WIDTH,CANVAS_HEIGHT),CV_8UC3,cv::Scalar(0,0,0));
+
+    int thrd=1000;
+    double x1,y1,x2,y2,r,xc,yc;
+    xc=(double)(0.8*cos((double)((double)counter/180)));
+    yc=(double)(0.8*sin((double)((double)counter/180)));
+
+    for(int i=0;i<CANVAS_HEIGHT;i++){
+        for(int j=0;j<CANVAS_WIDTH;j++){
+            int n=0;
+            x1=(double)((double)(j-CANVAS_WIDTH/2)/(double)(CANVAS_WIDTH/4));
+            y1=(double)((double)(i-CANVAS_HEIGHT/2)/(double)(CANVAS_HEIGHT/4));
+    
+            do{
+                x2=(double)(x1*x1-y1*y1+xc);
+                y2=(double)(2*x1*y1+yc);
+                r=sqrt(x2*x2+y2*y2);
+                x1=x2;
+                y1=y2;
+                n++;
+                if(n>thrd){
+                    img.row(i).col(j)=cv::Scalar(0,0,0);
+                    break;
+                }
+            }while(r<100);
+	    
+            if(n<thrd){
+                int R,G,B;
+                double smooth;
+                smooth=(double)(n-log(n)/log(thrd));
+                smooth=10.0*smooth;
+                R=(int)(128+127*sin((double)((smooth+counter)/180)));
+                G=(int)(128+127*sin((double)((smooth+counter)/180+2*PI/3)));
+                B=(int)(128+127*sin((double)((smooth+counter)/180+4*PI/3)));
+                
+                img.row(i).col(j)=cv::Scalar(R,G,B);  
+            }
+
+
+        }
+    }
+    cv::imshow("julia",img);
+    img.cv::Mat::release();
+    cv::waitKey(170);
+    counter+=4;
+    julia();
+}
+
+void newton(){
+    cv::Mat img(cv::Size(CANVAS_WIDTH,CANVAS_HEIGHT),CV_8UC3,cv::Scalar(0,0,0));
+    int thrd=500;
+    double x1,y1,x2,y2,diff,rto;
+    rto=1.4-0.4*(double)(sin((double)counter/180));
+    //rto=1.0;
+    for(int i=0;i<CANVAS_HEIGHT;i++){
+        for(int j=0;j<CANVAS_WIDTH;j++){
+            int n=0;
+            x1=(double)(j-CANVAS_WIDTH/2)/(CANVAS_WIDTH/2)+0.8;
+            y1=(double)(i-CANVAS_HEIGHT/2)/(CANVAS_HEIGHT/2);
+            do{
+                double a,b,c,d;
+                //f=x^3-1
+                //a=x1*x1*x1-3*x1*y1*y1-1;
+                //b=3*x1*x1*y1-y1*y1*y1;
+                //c=3*x1*x1-3*y1*y1;
+                //d=6*x1*y1;
+               
+                //x^3-2*x^2+2
+                a=x1*x1*x1-3*x1*y1*y1-2*(x1*x1-y1*y1)+2;
+                b=3*x1*x1*y1-y1*y1*y1-2*2*x1*y1;
+                c=3*(x1*x1-y1*y1)-2;
+                d=3*2*x1*y1;
+                
+                
+                x2=x1+rto*((a*c+b*d)/(c*c+d*d));
+                y2=y1+rto*((-a*d+b*c)/(c*c+d*d));
+                
+                diff=abs(x2-x1);
+                n++;
+                x1=x2;
+                y1=y2;
+                if(n>thrd){
+                    img.row(i).col(j)=cv::Scalar(0,0,0);
+                    break;
+                }
+            }while(diff>0.01);
+            
+            if(n<thrd){
+                int R,G,B;
+                double smooth;
+                smooth=(double)((double)n-log(n)/log(thrd));
+                smooth=(double)(50.0*smooth);
+                R=(int)(128+127*sin((double)((smooth+counter)/180)));
+                G=(int)(128+127*sin((double)((smooth+counter)/180+2*PI/3)));
+                B=(int)(128+127*sin((double)((smooth+counter)/180+4*PI/3)));
+                
+                img.row(j).col(i)=cv::Scalar(R,G,B);  
+            }
+
+
+
+        }
+    }
+    cv::imshow("newton",img);
+    img.cv::Mat::release();
+    cv::waitKey(140);
+    counter+=2;
+    newton();
+}
+
 int main(){
     std::cout<<"Hello, world!"<<endl;
-    mandelbrot();
+    newton();
     return 0;
 }

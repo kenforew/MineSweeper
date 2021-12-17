@@ -783,16 +783,16 @@ void gameDisplay()
     img.cv::Mat::release();
 
     switch(cv::waitKey(100)){
-        case 101:
+        case 101://easy
             modeChange(0);
             break;
-        case 110:
+        case 110://normal
             modeChange(1);
             break;
-        case 104:
+        case 104://hard
             modeChange(2);
             break;
-        case 114:
+        case 114://reset
             gameInitialize();
             break;
         default:

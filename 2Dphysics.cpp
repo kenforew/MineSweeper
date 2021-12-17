@@ -287,6 +287,21 @@ public:
                     return;
                 }
             }else{
+                //hit around corner
+                double l_old,l_new,r_ptr,flag=false;
+                r_ptr=(*stone_ptr).getr();
+                for(int i=0;i<2;i++){
+                    l_old=sqrt((lineSegment[i][0]-x_old)*(lineSegment[i][0]-x_old)+(lineSegment[i][1]-y_old)*(lineSegment[i][1]-y_old));
+                    l_new=sqrt((lineSegment[i][0]-x_new)*(lineSegment[i][0]-x_new)+(lineSegment[i][1]-y_new)*(lineSegment[i][1]-y_new));
+                    if(l_old>=r_ptr&&l_new<r_ptr){
+                        flag=true;
+                        break;
+                    }
+                }
+                if(flag){
+                    
+                }
+
                 return;
             }
         }
@@ -307,8 +322,8 @@ void title(){
 }
 
 void stoneInitialize(){
-    stones.push_back(Stone(400,10,1.0,0.9,3.0,-2.0,10.0));
-    stones.push_back(Stone(200,10,1.0,0.9,-2.0,4.0,10.0));
+    stones.push_back(Stone(400,10,1.0,0.9,3.1,-2.0,10.0));
+    stones.push_back(Stone(200,10,1.0,0.9,-2.1,4.0,10.0));
 
     //cout<<"check : "<<stones[0].getx()<<endl;
     //cout<<"initial e : "<<stones[0].gete()<<endl;
@@ -370,6 +385,7 @@ void colliderInitialize(){
     generateCollider(600,300,20,100,20);
     generateCollider(750,200,10,20,200);
     generateCollider(400,100,10,20,100);
+    generateCollider(340,260,10,100,20);
 }
 
 void randomVel(){
@@ -429,7 +445,6 @@ for(int huga=0;true;){
         Stone* meme_ptr=&meme;
         colliders[i].collisionJudge(meme_ptr);    
     }
-
     
     //stone
 

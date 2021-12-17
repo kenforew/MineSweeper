@@ -126,6 +126,7 @@ void mouse_callback(int event,int x,int y,int flags,void *userdata)
 
 int counter=0;
 void display(){
+    for(int huga=0;true;){
     counter++;
     std::cout<<"frame "<<counter<<endl;
     cv::Mat img(cv::Size(CANVAS_WIDTH,CANVAS_HEIGHT),CV_8UC3,cv::Scalar(0,0,0));
@@ -240,7 +241,7 @@ void display(){
     //delete img;
     //delete canvas;
     
-    display();
+}
 }
 
 int main(){
