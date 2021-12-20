@@ -136,6 +136,7 @@ public:
         y_old=(*stone_ptr).gety();
         x_new=(*stone_ptr).getx()+(*stone_ptr).getvx();
         y_new=(*stone_ptr).gety()+(*stone_ptr).getvy();
+        
         //cout<<"head collider : "<<x_old<<" "<<y_old<<" "<<x_new<<" "<<y_new<<endl;
         
         if(lineSegment[0][0]==lineSegment[1][0]){//x1=x2,y=a;
@@ -143,8 +144,7 @@ public:
             int x0=lineSegment[0][0];
             int minY,maxY;
             minY=lineSegment[0][1]<=lineSegment[1][1]?lineSegment[0][1]:lineSegment[1][1];
-            maxY=lineSegment[0][1]>lineSegment[1][1]?lineSegment[0][1]:lineSegment[1][1];
-            
+            maxY=lineSegment[0][1]>lineSegment[1][1]?lineSegment[0][1]:lineSegment[1][1];            
             
             if((minY<=y_old)&&(y_old<=maxY)){
                 double r_ptr=(*stone_ptr).getr();
@@ -217,6 +217,7 @@ public:
 		    
                     inner_prd=vx*cx+vy*cy;
                     cross_prd=vx*cy-vy*cx;
+                    
                     if(cross_prd<0){
                     //cout<<"inner, cross : "<<inner_prd<<" "<<cross_prd<<endl;
                     costh=inner_prd/(sqrt(vx*vx+vy*vy)*sqrt(cx*cx+cy*cy));
@@ -288,18 +289,81 @@ public:
                 }
             }else{
                 //hit around corner
-                double l_old,l_new,r_ptr,flag=false;
+                double l_old,l_new,r_ptr,e_ptr,flag=false;
                 r_ptr=(*stone_ptr).getr();
-                for(int i=0;i<2;i++){
-                    l_old=sqrt((lineSegment[i][0]-x_old)*(lineSegment[i][0]-x_old)+(lineSegment[i][1]-y_old)*(lineSegment[i][1]-y_old));
-                    l_new=sqrt((lineSegment[i][0]-x_new)*(lineSegment[i][0]-x_new)+(lineSegment[i][1]-y_new)*(lineSegment[i][1]-y_new));
-                    if(l_old>=r_ptr&&l_new<r_ptr){
-                        flag=true;
-                        break;
-                    }
+                e_ptr=(*stone_ptr).gete();
+                //for(int i=0;i<2;i++){
+                int i=0;
+                l_old=sqrt((lineSegment[i][0]-x_old)*(lineSegment[i][0]-x_old)+(lineSegment[i][1]-y_old)*(lineSegment[i][1]-y_old));
+                l_new=sqrt((lineSegment[i][0]-x_new)*(lineSegment[i][0]-x_new)+(lineSegment[i][1]-y_new)*(lineSegment[i][1]-y_new));
+                if(l_old>=r_ptr&&l_new<r_ptr){
+                    flag=true;
                 }
+                //}
                 if(flag){
+                    double vx,vy,sx,sy,c1x,c1y,isx,isy,x1,y1,x2,y2,a,b,c;
+                    vx=(*stone_ptr).getvx();
+                    vy=(*stone_ptr).getvy();
+                    sx=(*stone_ptr).getx();
+                    sy=(*stone_ptr).gety();
+                    c1x=lineSegment[0][0];
+                    c1y=lineSegment[0][1];
                     
+                    a=vy*sx-vx*sy-vy*c1x;
+                    b=-vy*c1y;
+                    c=vy*r_ptr;
+
+                    y1=((-a*vx+b*vy)-sqrt(c*c*(vx*vx+vy*vy)-(a*vy-b*vx)*(a*vy-b*vx)))/sqrt(vx*vx+vy*vy);
+                    y2=((-a*vx+b*vy)+sqrt(c*c*(vx*vx+vy*vy)-(a*vy-b*vx)*(a*vy-b*vx)))/sqrt(vx*vx+vy*vy);
+    
+                    a=-vx*c1x;
+                    b=-vy*sx+vx*sy-vx*c1y;
+                    c=vx*r_ptr;
+
+                    x1=(-(a*vx+b*vy)-abs(c*c*(vx*vx+vy*vy)-(a*vy-b*vx)*(a*vy-b*vx)))/sqrt(vx*vx+vy*vy);
+                    x2=(-(a*vx+b*vy)+abs(c*c*(vx*vx+vy*vy)-(a*vy-b*vx)*(a*vy-b*vx)))/sqrt(vx*vx+vy*vy);
+		    
+                    vector<double> v1,v2;
+                    //double ip1,ip2,ip3,ip4,ipmax,ipmin;
+                    double ip1,ip2;
+
+                    v1={x2,y2};
+                    //v2={x2,y1};
+                    //v3={x1,y2};
+                    v2={x1,y1};
+
+                    ip1=v1[0]*vx+v1[1]*vy;
+                    //ip2=v2[0]*vx+v2[1]*vy;
+                    //ip3=v3[0]*vx+v3[1]*vy; 
+                    ip2=v2[0]*vx+v2[1]*vy;
+
+                    //cout<<"1,2,3,4:"<<ip1<<" "<<ip2<<" "<<ip3<<" "<<ip4<<endl;
+		    
+                    if(ip1>0){
+                        isx=v1[0];isy=v1[1];
+                    }else{
+                        isx=v2[0];isy=v2[1];
+                    }
+
+                    double inner_prd,cross_prd,costh,th;
+                    inner_prd=((c1x-isx)*vx+(c1y-isy)*vy);
+                    cross_prd=((c1x-isx)*vx-(c1y-isy)*vy);
+                    costh=inner_prd/(sqrt((c1x-isx)*(c1x-isx)+(c1y-isy)*(c1y-isy))*sqrt(vx*vx+vy*vy));
+                    th=acos(costh);
+
+                    int sgn=1;                    
+                    if(cross_prd<0)sgn*=(-1);
+
+                    double vx2,vy2;
+                    
+                    vx2=vx*cos(th*sgn)-vy*sin(th*sgn);
+                    vy2=vx*sin(th*sgn)+vy*cos(th*sgn);
+
+                    //(*stone_ptr).setx(isx);
+                    //(*stone_ptr).sety(isy);
+                    
+                    (*stone_ptr).setvx(vx2*e_ptr);
+                    (*stone_ptr).setvy(vy2*e_ptr);
                 }
 
                 return;
@@ -385,7 +449,6 @@ void colliderInitialize(){
     generateCollider(600,300,20,100,20);
     generateCollider(750,200,10,20,200);
     generateCollider(400,100,10,20,100);
-    generateCollider(340,260,10,100,20);
 }
 
 void randomVel(){
