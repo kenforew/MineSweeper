@@ -4,6 +4,13 @@
 #include <random>
 #include <vector>
 
+#include <cstdlib>
+#include <Windows.h>
+#include <unistd.h>
+
+#include <chrono>
+#include <thread>
+
 #include <opencv2/opencv.hpp>
 
 using namespace std;
@@ -160,6 +167,7 @@ private:
     bool mouseDownFlag;
     bool leftClickFlag;
     bool longPressFlag;
+    bool initFlag;
 
     bool gameover;
     bool gameclear;
@@ -183,6 +191,8 @@ private:
     cv::Mat canvas;
     
     std::default_random_engine generator;
+
+    int time;
         
 public:
     MineSweeper(){
@@ -200,6 +210,7 @@ public:
         mouseDownFlag=false;
         leftClickFlag=false;
         longPressFlag=false;
+        initFlag=false;
 
         gameover=false;
         gameclear=false;
@@ -213,6 +224,8 @@ public:
         cellsize=interval/2.2;
 
         cursor={3,3,3};
+
+        time=0;
     }
     ~MineSweeper(){
 
@@ -255,6 +268,9 @@ public:
     }
     void setlongPressFlag(bool ff){
         longPressFlag=ff;
+    }
+    void setinitFlag(bool ff){
+        initFlag=ff;
     }
     void setgameover(bool gg){
         gameover=gg;
@@ -375,6 +391,9 @@ public:
     void setcanvas(cv::Mat cc){
         canvas=cc;
     }
+    void settime(int tt){
+        time=tt;
+    }
     int getCANVAS_WIDTH(){
         return CANVAS_WIDTH;
     }
@@ -413,6 +432,9 @@ public:
     }
     bool getlongPressFlag(){
         return longPressFlag;
+    }
+    bool getinitFlag(){
+        return initFlag;
     }
     bool getgameover(){
         return gameover;
@@ -487,11 +509,14 @@ public:
         std::uniform_int_distribution<int> distribution(0,boardX*boardY*boardZ-1);
         return distribution(generator);
     }
+    int gettime(){
+        return time;
+    }
 };
 
 MineSweeper MS;
 
-int timeCounter();
+void timeCounter();
 int flagCounter();
 void generateLists();
 void modeChange(int);
@@ -508,10 +533,17 @@ int count(int,int,int);
 int count2(int,int,int,int,int,int);
 void gameDisplay();
 
-int timeCounter(){
-    int x=0;
-    
-    return x;
+void timeCounter(){
+    while(true){
+        while(MS.getinitFlag()){
+            sleep(1);
+            while(MS.getinitFlag()){
+                MS.settime(MS.gettime()+1);
+                sleep(1);
+            }
+        }
+    }
+    return;
 }
 int flagCounter(){
     int x=0;
@@ -651,6 +683,7 @@ void gameClearJudge(){
     if(counter==MS.getboardX()*MS.getboardY()*MS.getboardZ()-MS.getmines()){
         MS.setgameclear(true);
         MS.setgameover(true);
+        MS.setinitFlag(false);
     }
 
     if(MS.getgameclear()){
@@ -662,6 +695,8 @@ void gameInitialize(){
 
     MS.setgameover(false);
     MS.setgameclear(false);
+    MS.settime(0);
+    MS.setinitFlag(false);
 
     MS.setmouseDownX(0);
     MS.setmouseDownY(0);
@@ -857,7 +892,7 @@ void mouse_callback(int event,int x,int y,int flags,void *userdata)
         MS.setmouseDownFlag(true);
         MS.setleftClickFlag(true);
         MS.setlongPressFlag(false);
-    }
+     }
     if(event==cv::EVENT_LBUTTONUP){
         MS.setmouseDownFlag(false);
         if(!MS.getlongPressFlag()){
@@ -875,6 +910,7 @@ void mouse_callback(int event,int x,int y,int flags,void *userdata)
                     if(MS.getdanger(cx,cy,cz)){//bomb
                         (*(MS.getmainlistPtr(cx*MS.getboardY()*MS.getboardZ()+cy*MS.getboardZ()+cz))).setlabel("b");
                         MS.setgameover(true);
+                        MS.setinitFlag(false);
                     }else if(safe(cx,cy,cz)){//no mine around
                         MS.setvisual(cx,cy,cz,0);
                         (*(MS.getmainlistPtr(cx*MS.getboardY()*MS.getboardZ()+cy*MS.getboardZ()+cz))).setlabel("");
@@ -885,6 +921,10 @@ void mouse_callback(int event,int x,int y,int flags,void *userdata)
                         (*(MS.getmainlistPtr(cx*MS.getboardY()*MS.getboardZ()+cy*MS.getboardZ()+cz))).setlabel(to_string(MS.getvisual(cx,cy,cz)));
                         (*(MS.getmainlistPtr(cx*MS.getboardY()*MS.getboardZ()+cy*MS.getboardZ()+cz))).setcolor(cellColor(MS.getvisual(cx,cy,cz)));
                     }
+                    
+                    if(!MS.getgameover()){
+                        MS.setinitFlag(true);
+                    }                    
                 }
             }else{
                 if(r==0xff){
@@ -974,7 +1014,7 @@ void gameDisplay()
     putText(img,"N:Normal",cv::Point(10,100),1,1.2,cv::Scalar(0xfe,0xfe,0xfe)); 
     putText(img,"H:Hard",cv::Point(10,130),1,1.2,cv::Scalar(0xfe,0xfe,0xfe));
     putText(img,"Flag : "+to_string(flagCounter()),cv::Point(10,200),1,1.2,cv::Scalar(0xfe,0xfe,0xfe));
-    putText(img,"Time : "+to_string(timeCounter()),cv::Point(10,230),1,1.2,cv::Scalar(0xfe,0xfe,0xfe));
+    putText(img,"Time : "+to_string(MS.gettime()),cv::Point(10,230),1,1.2,cv::Scalar(0xfe,0xfe,0xfe));
     
     vector<Cell> sortlist;
     for(int i=0;i<MS.getmainlistAll().size();i++){
@@ -1141,6 +1181,10 @@ void gameDisplay()
 
 int main( int argc, char** argv )
 { 
-    gameInitialize();
+	std::thread th_main(gameInitialize);
+    std::thread th_time(timeCounter);
+    
+    th_main.join();
+    th_time.join(); 
     return 0;
 }

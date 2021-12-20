@@ -3,6 +3,9 @@
 #include <math.h>
 #include <random>
 #include <vector>
+#include <cstdlib>
+#include <Windows.h>
+#include <unistd.h>
 
 #include <chrono>
 #include <thread>
@@ -444,14 +447,34 @@ for(int hoge=0;true;){
 }
 }
 
+void ThreadA(){
+for(int hoge=0;true;){
+    cout<<"thread A"<<endl;
+    sleep(1);
+}
+}
+void ThreadB(){
+for(int hoge=0;true;){
+    cout<<"thread B"<<endl;
+    cv::Mat img(cv::Size(CANVAS_WIDTH,CANVAS_HEIGHT),CV_8UC3,cv::Scalar(0,0,0));
+    cv::imshow("testimg",img);
+    img.cv::Mat::release();
+    cv::waitKey(0);
+}
+}
+
 int main(){
     mazelist.push_back(Maze(CANVAS_WIDTH/2,CANVAS_HEIGHT/2,600,PI/4,1));
     //mazelist.push_back(Maze(200,480,100,PI/4,1));
     
     //test();
     //
+    std::thread th_a(ThreadA);
+    std::thread th_b(ThreadB);
 
+    th_a.join();
+    th_b.join();
 
-    gravitydisplay();
+    //gravitydisplay();
     return 0;
 }
