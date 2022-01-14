@@ -6,37 +6,38 @@
 #include <algorithm>
 
 #include <opencv2/opencv.hpp>
+namespace truchet{
+namespace{
+    #define CANVAS_WIDTH 960 //16 tiles
+    #define CANVAS_HEIGHT 960 //16 tiles
+    #define CELL_SIZE 60 
 
-using namespace std;
+    int cursorX=CANVAS_WIDTH/(4*CELL_SIZE);
+    int cursorY=CANVAS_HEIGHT/(4*CELL_SIZE);
 
-#define CANVAS_WIDTH 960 //16 tiles
-#define CANVAS_HEIGHT 960 //16 tiles
-#define CELL_SIZE 60 
+    int initzoom=-50;
+    int zoom=initzoom;
 
-int cursorX=CANVAS_WIDTH/(4*CELL_SIZE);
-int cursorY=CANVAS_HEIGHT/(4*CELL_SIZE);
+    bool initFlag=true;
+    bool onGame=false;
 
-int initzoom=-50;
-int zoom=initzoom;
+    std::vector<std::vector<bool>> truchet;
+    std::vector<cv::Scalar> ctank={cv::Scalar(0,0,0),cv::Scalar(0xff,0xff,0xff)};
+    std::vector<std::vector<int>> ltank={{0xff,0xff,0},{0xff,0,0xff},{0,0xff,0xff}};
 
-bool initFlag=true;
-bool onGame=false;
+    std::vector<std::vector<std::vector<short>>> liquid;
+    std::vector<short> start={0,0xff,0xff};
+    std::vector<short> goal={0xff,0,0xff};
 
-vector<vector<bool>> truchet;
-vector<cv::Scalar> ctank={cv::Scalar(0,0,0),cv::Scalar(0xff,0xff,0xff)};
-vector<vector<int>> ltank={{0xff,0xff,0},{0xff,0,0xff},{0,0xff,0xff}};
+    std::vector<int> startxyz={0,0,0};
 
-vector<vector<vector<short>>> liquid;
-vector<short> start={0,0xff,0xff};
-vector<short> goal={0xff,0,0xff};
+    cv::Mat canvas;
 
-vector<int> startxyz={0,0,0};
+    std::default_random_engine generator;
+    std::uniform_int_distribution<int> distribution(0,1);
+    std::uniform_int_distribution<int> distribution2(0,7);
+};
 
-cv::Mat canvas;
-
-std::default_random_engine generator;
-std::uniform_int_distribution<int> distribution(0,1);
-std::uniform_int_distribution<int> distribution2(0,7);
 
 void title();
 void truchetInitialize();
@@ -128,7 +129,7 @@ int counter=0;
 void display(){
     for(int huga=0;true;){
     counter++;
-    std::cout<<"frame "<<counter<<endl;
+    std::cout<<"frame "<<counter<<std::endl;
     cv::Mat img(cv::Size(CANVAS_WIDTH,CANVAS_HEIGHT),CV_8UC3,cv::Scalar(0,0,0));
     
     double pers=pow(1.005,zoom);
@@ -244,9 +245,14 @@ void display(){
 }
 }
 
+    void gamestart(){
+        title();
+        truchetInitialize();
+        display();
+    }
+};
+
 int main(){
-    title();
-    truchetInitialize();
-    display();
+    truchet::gamestart();
     return 0;
 }

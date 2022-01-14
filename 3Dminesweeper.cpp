@@ -5,7 +5,6 @@
 #include <vector>
 
 #include <cstdlib>
-#include <Windows.h>
 #include <unistd.h>
 
 #include <chrono>
@@ -13,8 +12,7 @@
 
 #include <opencv2/opencv.hpp>
 
-using namespace std;
-
+namespace TDMineSweeper{
 class Physics{
 protected:
     double x;
@@ -59,6 +57,7 @@ public:
         dy=x*sin(rotZ)+y*cos(rotZ);
         x=dx;
         y=dy;
+        
         rotY=-rotY;
 
         dz=z*cos(rotY)-x*sin(rotY);
@@ -70,11 +69,11 @@ public:
 
 class Controller : public Physics{
 private:
-    int ex;
-    int ey;
-    int ez;
+    std::int8_t ex;
+    std::int8_t ey;
+    std::int8_t ez;
 public:
-    Controller(double xx,double yy,double zz,int exx,int eyy,int ezz):Physics(xx,yy,zz)
+    Controller(double xx,double yy,double zz,std::int8_t exx,std::int8_t eyy,std::int8_t ezz):Physics(xx,yy,zz)
     {
         x=xx;
         y=yy;
@@ -87,15 +86,15 @@ public:
     ~Controller(){
     }
 
-    int getex(){
+    std::int8_t getex(){
         return ex;
     }
 
-    int getey(){
+    std::int8_t getey(){
         return ey;
     }
 
-    int getez(){
+    std::int8_t getez(){
         return ez;
     }
 };
@@ -103,12 +102,12 @@ public:
 class Cell : public Physics{
 private:
     cv::Scalar color;
-    string label;
-    int vx;
-    int vy;
-    int vz;
+    std::string label;
+    std::int8_t vx;
+    std::int8_t vy;
+    std::int8_t vz;
 public:   
-    Cell(double xx,double yy,double zz,cv::Scalar cc,string ll,int exx,int eyy,int ezz):Physics(xx,yy,zz){
+    Cell(double xx,double yy,double zz,cv::Scalar cc,std::string ll,std::int8_t exx,std::int8_t eyy,std::int8_t ezz):Physics(xx,yy,zz){
         x=xx;
         y=yy;
         z=zz;
@@ -126,19 +125,19 @@ public:
         return color;
     }
 
-    string getlabel(){
+    std::string getlabel(){
         return label;
     }
 
-    int getvx(){
+    std::int8_t getvx(){
         return vx;
     }
 
-    int getvy(){
+    std::int8_t getvy(){
         return vy;
     }
 
-    int getvz(){
+    std::int8_t getvz(){
         return vz;
     }
 
@@ -146,24 +145,24 @@ public:
         color=cc;
     }
 
-    void setlabel(string ll){
+    void setlabel(std::string ll){
         label=ll;
     }
 };
 
 class MineSweeper{
 private:
-    int CANVAS_WIDTH;
-    int CANVAS_HEIGHT;
+    std::int16_t CANVAS_WIDTH;
+    std::int16_t CANVAS_HEIGHT;
 
-    int mouseDownX;
-    int mouseDownY;
-    int mouseEscapeX;
-    int mouseEscapeY;
-    int mouseUpdateX;
-    int mouseUpdateY;
-    int mouseUpX;
-    int mouseUpY;
+    std::int16_t mouseDownX;
+    std::int16_t mouseDownY;
+    std::int16_t mouseEscapeX;
+    std::int16_t mouseEscapeY;
+    std::int16_t mouseUpdateX;
+    std::int16_t mouseUpdateY;
+    std::int16_t mouseUpX;
+    std::int16_t mouseUpY;
     bool mouseDownFlag;
     bool leftClickFlag;
     bool longPressFlag;
@@ -172,27 +171,29 @@ private:
     bool gameover;
     bool gameclear;
 
-    int boardX;
-    int boardY;
-    int boardZ;
-    int mines;
+    std::int8_t boardX;
+    std::int8_t boardY;
+    std::int8_t boardZ;
+    std::int8_t mines;
 
-    int interval;
-    int cellsize;
+    std::int8_t interval;
+    std::int8_t cellsize;
 
-    vector<vector<vector<bool>>> danger;
-    vector<vector<vector<bool>>> demined;
-    vector<vector<vector<int>>> visual;
-    vector<int> cursor;
+    std::vector<std::vector<std::vector<bool>>> danger;
+    std::vector<std::vector<std::vector<bool>>> demined;
+    std::vector<std::vector<std::vector<std::int8_t>>> visual;
+    std::vector<std::int8_t> cursor;
 
-    vector<Controller> controllerlist;
-    vector<Cell> mainlist;
+    std::vector<Controller> controllerlist;
+    std::vector<Cell> mainlist;
 
     cv::Mat canvas;
     
     std::default_random_engine generator;
+    
+    std::random_device rd;
 
-    int time;
+    std::int16_t time;
         
 public:
     MineSweeper(){
@@ -228,36 +229,45 @@ public:
         time=0;
     }
     ~MineSweeper(){
+        delete &danger;
+        delete &demined;
+        delete &visual;
+        delete &cursor;
 
+        delete &controllerlist;
+        delete &mainlist;
+
+        canvas.release();
+    
     }
-    void setCANVAS_WIDTH(int xx){
+    void setCANVAS_WIDTH(std::int16_t xx){
         CANVAS_WIDTH=xx;
     }
-    void setCANVAS_HEIGHT(int yy){
+    void setCANVAS_HEIGHT(std::int16_t yy){
         CANVAS_HEIGHT=yy;
     }
-    void setmouseDownX(int xx){
+    void setmouseDownX(std::int16_t xx){
         mouseDownX=xx;
     }
-    void setmouseDownY(int yy){
+    void setmouseDownY(std::int16_t yy){
         mouseDownY=yy;
     }
-    void setmouseEscapeX(int xx){
+    void setmouseEscapeX(std::int16_t xx){
         mouseEscapeX=xx;
     }
-    void setmouseEscapeY(int yy){
+    void setmouseEscapeY(std::int16_t yy){
         mouseEscapeY=yy;
     }
-    void setmouseUpdateX(int xx){
+    void setmouseUpdateX(std::int16_t xx){
         mouseUpdateX=xx;
     }
-    void setmouseUpdateY(int yy){
+    void setmouseUpdateY(std::int16_t yy){
         mouseUpdateY=yy;
     }
-    void setmouseUpX(int xx){
+    void setmouseUpX(std::int16_t xx){
         mouseUpX=xx;
     }
-    void setmouseUpY(int yy){
+    void setmouseUpY(std::int16_t yy){
         mouseUpY=yy;
     }
     void setmouseDownFlag(bool ff){
@@ -278,25 +288,25 @@ public:
     void setgameclear(bool gg){
         gameclear=gg;
     }
-    void setboardX(int xx){
+    void setboardX(std::int8_t xx){
         boardX=xx;
     }
-    void setboardY(int yy){
+    void setboardY(std::int8_t yy){
         boardY=yy;
     }
-    void setboardZ(int zz){
+    void setboardZ(std::int8_t zz){
         boardZ=zz;
     }
-    void setmines(int mm){
+    void setmines(std::int8_t mm){
         mines=mm;
     }
-    void setinterval(int ii){
+    void setinterval(std::int8_t ii){
         interval=ii;
     }
-    void setcellsize(int cc){
+    void setcellsize(std::int8_t cc){
         cellsize=cc;
     }
-    void setdangerAll(vector<vector<vector<bool>>> dd){
+    void setdangerAll(std::vector<std::vector<std::vector<bool>>> dd){
         for(int i=0;i<boardX;i++){
             for(int j=0;j<boardY;j++){
                 for(int k=0;k<boardZ;k++){
@@ -316,10 +326,10 @@ public:
             }
         }
     }
-    void setdanger(int x,int y,int z,bool dd){
+    void setdanger(std::int8_t x,std::int8_t y,std::int8_t z,bool dd){
         danger[x][y][z]=dd;
     }
-    void setdeminedAll(vector<vector<vector<bool>>> dd){
+    void setdeminedAll(std::vector<std::vector<std::vector<bool>>> dd){
         for(int i=0;i<boardX;i++){
             for(int j=0;j<boardY;j++){
                 for(int k=0;k<boardZ;k++){
@@ -339,10 +349,10 @@ public:
             }
         }
     }
-    void setdemined(int x,int y,int z,bool dd){
+    void setdemined(std::int8_t x,std::int8_t y,std::int8_t z,bool dd){
         demined[x][y][z]=dd;
     }
-    void setvisualAll(vector<vector<vector<int>>> vv){
+    void setvisualAll(std::vector<std::vector<std::vector<std::int8_t>>> vv){
         for(int i=0;i<boardX;i++){
             for(int j=0;j<boardY;j++){
                 for(int k=0;k<boardZ;k++){
@@ -363,65 +373,62 @@ public:
         }
 
     }
-    void setvisual(int x,int y,int z,int vv){
+    void setvisual(std::int8_t x,std::int8_t y,std::int8_t z,std::int8_t vv){
         visual[x][y][z]=vv;
     }
-    void setcursor(int i,int v){
+    void setcursor(std::int8_t i,std::int8_t v){
 	    cursor[i]=v;
     }
-    void setcontrollerlist(vector<Controller> cc){
-        for(size_t i=0;i<cc.size();i++){
+    void setcontrollerlist(std::vector<Controller> cc){
+        for(int i=0;i<cc.size();i++){
             controllerlist.push_back(cc[i]);
         }
     }
     void setcontrollerlistClear(){
         controllerlist.clear();
-        //cout<<"cl"<<controllerlist.size()<<endl;
-        //controllerlist.resize(6);
     }
-    void setmainlist(vector<Cell> mm){
-        for(size_t i=0;i<mm.size();i++){
+    void setmainlist(std::vector<Cell> mm){
+        for(int i=0;i<mm.size();i++){
             mainlist.push_back(mm[i]);
         }
     }
     void setmainlistClear(){
         mainlist.clear();
-        //mainlist.resize(boardX*boardY*boardZ);
     }
     void setcanvas(cv::Mat cc){
         canvas=cc;
     }
-    void settime(int tt){
+    void settime(std::int16_t tt){
         time=tt;
     }
-    int getCANVAS_WIDTH(){
+    std::int16_t getCANVAS_WIDTH(){
         return CANVAS_WIDTH;
     }
-    int getCANVAS_HEIGHT(){
+    std::int16_t getCANVAS_HEIGHT(){
         return CANVAS_HEIGHT;
     }
-    int getmouseDownX(){
+    std::int16_t getmouseDownX(){
         return mouseDownX;
     }
-    int getmouseDownY(){
+    std::int16_t getmouseDownY(){
         return mouseDownY;
     }
-    int getmouseEscapeX(){
+    std::int16_t getmouseEscapeX(){
         return mouseEscapeX;
     }
-    int getmouseEscapeY(){
+    std::int16_t getmouseEscapeY(){
         return mouseEscapeY;
     }
-    int getmouseUpdateX(){
+    std::int16_t getmouseUpdateX(){
         return mouseUpdateX;
     }
-    int getmouseUpdateY(){
+    std::int16_t getmouseUpdateY(){
         return mouseUpdateY;
     }
-    int getmouseUpX(){
+    std::int16_t getmouseUpX(){
         return mouseUpX;
     }
-    int getmouseUpY(){
+    std::int16_t getmouseUpY(){
         return mouseUpY;
     }
     bool getmouseDownFlag(){
@@ -442,74 +449,75 @@ public:
     bool getgameclear(){
         return gameclear;
     }
-    int getboardX(){
+    std::int8_t getboardX(){
         return boardX;
     }
-    int getboardY(){
+    std::int8_t getboardY(){
         return boardY;
     }
-    int getboardZ(){
+    std::int8_t getboardZ(){
         return boardZ;
     }
-    int getmines(){
+    std::int8_t getmines(){
         return mines;
     }
-    int getinterval(){
+    std::int8_t getinterval(){
         return interval;
     }
-    int getcellsize(){
+    std::int8_t getcellsize(){
         return cellsize;
     }
-    vector<vector<vector<bool>>> getdangerAll(){
+    std::vector<std::vector<std::vector<bool>>> getdangerAll(){
         return danger;
     }
-    bool getdanger(int x,int y,int z){
+    bool getdanger(std::int8_t x,std::int8_t y,std::int8_t z){
         return danger[x][y][z];
     }
-    vector<vector<vector<bool>>> getdeminedAll(){
+    std::vector<std::vector<std::vector<bool>>> getdeminedAll(){
         return demined;
     }
-    bool getdemined(int x,int y,int z){
+    bool getdemined(std::int8_t x,std::int8_t y,std::int8_t z){
         return demined[x][y][z];
     }
-    vector<vector<vector<int>>> getvisualAll(){
+    std::vector<std::vector<std::vector<std::int8_t>>> getvisualAll(){
         return visual;
     }
-    int getvisual(int x,int y,int z){
+    std::int8_t getvisual(std::int8_t x,std::int8_t y,std::int8_t z){
         return visual[x][y][z];
     }
-    vector<int> getcursorAll(){
+    std::vector<std::int8_t> getcursorAll(){
         return cursor;
     }
-    int getcursor(int i){
+    std::int8_t getcursor(std::int8_t i){
         return cursor[i];
     }
-    vector<Controller> getcontrollerlistAll(){
+    std::vector<Controller> getcontrollerlistAll(){
         return controllerlist;
     }
-    Controller getcontrollerlist(int i){
+    Controller getcontrollerlist(std::int8_t i){
         return controllerlist[i];
     }
-    Controller * getcontrollerlistPtr(int i){
+    Controller * getcontrollerlistPtr(std::int8_t i){
         return &controllerlist[i];
     }
-    vector<Cell> getmainlistAll(){
+    std::vector<Cell> getmainlistAll(){
         return mainlist;
     }
-    Cell getmainlist(int i){
+    Cell getmainlist(std::int16_t i){
         return mainlist[i];
     }
-    Cell * getmainlistPtr(int i){
+    Cell * getmainlistPtr(std::int16_t i){
         return &mainlist[i];
     }
     cv::Mat getcanvas(){
         return canvas;
     }
-    int random(){
-        std::uniform_int_distribution<int> distribution(0,boardX*boardY*boardZ-1);
-        return distribution(generator);
+    std::int16_t random(){
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> distrib(0,boardX*boardY*boardZ-1);
+        return distrib(gen);
     }
-    int gettime(){
+    std::int16_t gettime(){
         return time;
     }
 };
@@ -517,20 +525,20 @@ public:
 MineSweeper MS;
 
 void timeCounter();
-int flagCounter();
+std::int8_t flagCounter();
 void generateLists();
-void modeChange(int);
-cv::Scalar cellColor(int);
+void modeChange(std::int8_t);
+cv::Scalar cellColor(unsigned short);
 void gameClearJudge();
 void gameInitialize();
 void boardInitialize();
 void dangerInitialize();
-void safechain(int,int,int);
-void safechain2(int,int,int,int,int,int);
-bool safe(int,int,int);
-bool safe2(int,int,int,int,int,int);
-int count(int,int,int);
-int count2(int,int,int,int,int,int);
+void safechain(std::int8_t,std::int8_t,std::int8_t);
+void safechain2(std::int8_t,std::int8_t,std::int8_t,std::int8_t,std::int8_t,std::int8_t);
+bool safe(std::int8_t,std::int8_t,std::int8_t);
+bool safe2(std::int8_t,std::int8_t,std::int8_t,std::int8_t,std::int8_t,std::int8_t);
+std::int8_t count(std::int8_t,std::int8_t,std::int8_t);
+std::int8_t count2(std::int8_t,std::int8_t,std::int8_t,std::int8_t,std::int8_t,std::int8_t);
 void gameDisplay();
 
 void timeCounter(){
@@ -545,8 +553,8 @@ void timeCounter(){
     }
     return;
 }
-int flagCounter(){
-    int x=0;
+std::int8_t flagCounter(){
+    std::int8_t x=0;
     for(int i=0;i<MS.getboardX();i++){
         for(int j=0;j<MS.getboardY();j++){
             for(int k=0;k<MS.getboardZ();k++){
@@ -564,9 +572,9 @@ void generateLists(){
     MS.setdeminedAllClear();
     MS.setvisualAllClear();
     
-    vector<vector<vector<bool>>> ddanger;
-    vector<vector<vector<bool>>> ddemined;
-    vector<vector<vector<int>>> vvisual;
+    std::vector<std::vector<std::vector<bool>>> ddanger;
+    std::vector<std::vector<std::vector<bool>>> ddemined;
+    std::vector<std::vector<std::vector<std::int8_t>>> vvisual;
 
     ddanger.clear();
     ddemined.clear();
@@ -576,14 +584,14 @@ void generateLists(){
     ddemined.resize(MS.getboardX());
     vvisual.resize(MS.getboardX());
 
-    for(size_t i=0;i<MS.getboardX();i++){
+    for(int i=0;i<MS.getboardX();i++){
         ddanger[i].resize(MS.getboardY());
         ddemined[i].resize(MS.getboardY());
         vvisual[i].resize(MS.getboardY());
     }
 
-    for(size_t i=0;i<MS.getboardX();i++){
-        for(size_t j=0;j<MS.getboardY();j++){
+    for(int i=0;i<MS.getboardX();i++){
+        for(int j=0;j<MS.getboardY();j++){
             ddanger[i][j].resize(MS.getboardZ());
             ddemined[i][j].resize(MS.getboardZ());
             vvisual[i][j].resize(MS.getboardZ());
@@ -606,7 +614,7 @@ void generateLists(){
 }
 
 
-void modeChange(int m){
+void modeChange(std::int8_t m){
     switch(m){
         case 0://easy
             MS.setboardX(6);
@@ -633,8 +641,8 @@ void modeChange(int m){
     gameInitialize();
 }
 
-cv::Scalar cellColor(int x){
-        int R=0,G=0,B=0;
+cv::Scalar cellColor(unsigned short x){
+        unsigned short R=0,G=0,B=0;
         
         if(x%3==0){
             R=0x11;
@@ -645,7 +653,7 @@ cv::Scalar cellColor(int x){
         }
         
         float var_g=x/2;
-        int gg=(int)var_g;
+        unsigned short gg=(unsigned short)var_g;
 
         if(gg%3==0){
             G=0x44;
@@ -656,7 +664,7 @@ cv::Scalar cellColor(int x){
         }
 
         float var_h=x/3;
-        int hh=(int)var_h;
+        unsigned short hh=(unsigned short)var_h;
         if(hh%3==0){
             B=0x77;
         }else if(hh%3==1){
@@ -669,7 +677,7 @@ cv::Scalar cellColor(int x){
 }
 
 void gameClearJudge(){
-    int counter=0;
+    unsigned short counter=0;
     for(int i=0;i<MS.getboardX();i++){
         for(int j=0;j<MS.getboardY();j++){
             for(int k=0;k<MS.getboardZ();k++){
@@ -687,7 +695,7 @@ void gameClearJudge(){
     }
 
     if(MS.getgameclear()){
-        std::cout<<"game clear"<<endl;
+        std::cout<<"game clear"<<std::endl;
     }
 }
 
@@ -716,11 +724,11 @@ void gameInitialize(){
     //------------------------------------
     MS.setcontrollerlistClear();
 
-    vector<Controller> clist;
+    std::vector<Controller> clist;
     clist.clear();
 
     for(int i=0;i<2;i++){
-        int var_i=2*i-1;
+        std::int8_t var_i=2*i-1;
         double var_l=MS.getCANVAS_HEIGHT()/4.0*var_i;
         clist.push_back(Controller(var_l,0.0,0.0,var_i,0,0));
         clist.push_back(Controller(0.0,var_l,0.0,0,var_i,0));
@@ -732,7 +740,7 @@ void gameInitialize(){
     //-------------------------------------
     MS.setmainlistClear();
 
-    vector<Cell> mlist;
+    std::vector<Cell> mlist;
     mlist.clear();
 
     for(int i=0;i<MS.getboardX();i++){
@@ -764,7 +772,7 @@ void boardInitialize(){
     }
 }
 void dangerInitialize(){
-    vector<int> mineIndex;
+    std::vector<std::int16_t> mineIndex;
     bool newIntFlag=true;
             
     mineIndex.clear();
@@ -783,15 +791,15 @@ void dangerInitialize(){
     }
 
     for(int i=0;i<MS.getmines();i++){
-        int x=(mineIndex[i]/(MS.getboardY()*MS.getboardZ()))%MS.getboardX();
-        int y=(mineIndex[i]/MS.getboardZ())%MS.getboardY();
-        int z=mineIndex[i]%MS.getboardZ();
+        std::int8_t x=(mineIndex[i]/(MS.getboardY()*MS.getboardZ()))%MS.getboardX();
+        std::int8_t y=(mineIndex[i]/MS.getboardZ())%MS.getboardY();
+        std::int8_t z=mineIndex[i]%MS.getboardZ();
         MS.setdanger(x,y,z,true);
     }
 
 }
 
-void safechain(int x,int y,int z){
+void safechain(std::int8_t x,std::int8_t y,std::int8_t z){
     for(int i=0;i<3;i++){
         for(int j=0;j<3;j++){
             for(int k=0;k<3;k++){
@@ -804,7 +812,7 @@ void safechain(int x,int y,int z){
     }
 }
 
-void safechain2(int x,int y,int z,int dx,int dy,int dz){
+void safechain2(std::int8_t x,std::int8_t y,std::int8_t z,std::int8_t dx,std::int8_t dy,std::int8_t dz){
     if(x>=0&&x<MS.getboardX()
     &&y>=0&&y<MS.getboardY()
     &&z>=0&&z<MS.getboardZ()
@@ -816,13 +824,13 @@ void safechain2(int x,int y,int z,int dx,int dy,int dz){
             MS.setvisual(x+dx,y+dy,z+dz,0);
             MS.setdemined(x+dx,y+dy,z+dz,true);
             (*(MS.getmainlistPtr((x+dx)*MS.getboardY()*MS.getboardZ()+(y+dy)*MS.getboardZ()+(z+dz)))).setcolor(cellColor(MS.getvisual(x+dx,y+dy,z+dz)));
-            (*(MS.getmainlistPtr((x+dx)*MS.getboardY()*MS.getboardZ()+(y+dy)*MS.getboardZ()+(z+dz)))).setlabel(to_string(MS.getvisual(x+dx,y+dy,z+dz)));
+            (*(MS.getmainlistPtr((x+dx)*MS.getboardY()*MS.getboardZ()+(y+dy)*MS.getboardZ()+(z+dz)))).setlabel(std::to_string(MS.getvisual(x+dx,y+dy,z+dz)));
             safechain(x+dx,y+dy,z+dz);
         }else{
             MS.setvisual(x+dx,y+dy,z+dz,count(x+dx,y+dy,z+dz));
             MS.setdemined(x+dx,y+dy,z+dz,true);
             (*(MS.getmainlistPtr((x+dx)*MS.getboardY()*MS.getboardZ()+(y+dy)*MS.getboardZ()+(z+dz)))).setcolor(cellColor(MS.getvisual(x+dx,y+dy,z+dz)));
-            (*(MS.getmainlistPtr((x+dx)*MS.getboardY()*MS.getboardZ()+(y+dy)*MS.getboardZ()+(z+dz)))).setlabel(to_string(MS.getvisual(x+dx,y+dy,z+dz)));
+            (*(MS.getmainlistPtr((x+dx)*MS.getboardY()*MS.getboardZ()+(y+dy)*MS.getboardZ()+(z+dz)))).setlabel(std::to_string(MS.getvisual(x+dx,y+dy,z+dz)));
             return;
         }
     }else{
@@ -830,7 +838,7 @@ void safechain2(int x,int y,int z,int dx,int dy,int dz){
     }
 }
 
-bool safe(int x,int y,int z){
+bool safe(std::int8_t x,std::int8_t y,std::int8_t z){
     bool result=true;
     for(int i=0;i<3;i++){
         for(int j=0;j<3;j++){
@@ -844,7 +852,7 @@ bool safe(int x,int y,int z){
     return result;
 }
 
-bool safe2(int x,int y,int z,int dx,int dy,int dz){
+bool safe2(std::int8_t x,std::int8_t y,std::int8_t z,std::int8_t dx,std::int8_t dy,std::int8_t dz){
     if(x+dx<0||x+dx>MS.getboardX()-1
     ||y+dy<0||y+dy>MS.getboardY()-1
     ||z+dz<0||z+dz>MS.getboardZ()-1){
@@ -858,8 +866,8 @@ bool safe2(int x,int y,int z,int dx,int dy,int dz){
     }
 }
 
-int count(int x,int y,int z){
-    int sum=0;
+std::int8_t count(std::int8_t x,std::int8_t y,std::int8_t z){
+    std::int8_t sum=0;
     for(int i=0;i<3;i++){
         for(int j=0;j<3;j++){
             for(int k=0;k<3;k++){
@@ -872,7 +880,7 @@ int count(int x,int y,int z){
     return sum;
 }
 
-int count2(int x,int y,int z,int dx,int dy,int dz){
+std::int8_t count2(std::int8_t x,std::int8_t y,std::int8_t z,std::int8_t dx,std::int8_t dy,std::int8_t dz){
     if(x+dx<0||x+dx>MS.getboardX()-1
     ||y+dy<0||y+dy>MS.getboardY()-1
     ||z+dz<0||z+dz>MS.getboardZ()-1){
@@ -896,12 +904,12 @@ void mouse_callback(int event,int x,int y,int flags,void *userdata)
     if(event==cv::EVENT_LBUTTONUP){
         MS.setmouseDownFlag(false);
         if(!MS.getlongPressFlag()){
-            short r,g,b;
+            unsigned short r,g,b;
             r=MS.getcanvas().at<uchar>(y,3*x);
             g=MS.getcanvas().at<uchar>(y,3*x+1);
             b=MS.getcanvas().at<uchar>(y,3*x+2);
            if(r==0xff&&g==0xff&&b==0xff){
-                int cx,cy,cz;
+                std::int8_t cx,cy,cz;
                 cx=MS.getcursor(0);
                 cy=MS.getcursor(1);
                 cz=MS.getcursor(2);
@@ -918,7 +926,7 @@ void mouse_callback(int event,int x,int y,int flags,void *userdata)
                         safechain(cx,cy,cz);
                     }else{//some mine around
                         MS.setvisual(cx,cy,cz,count(cx,cy,cz));
-                        (*(MS.getmainlistPtr(cx*MS.getboardY()*MS.getboardZ()+cy*MS.getboardZ()+cz))).setlabel(to_string(MS.getvisual(cx,cy,cz)));
+                        (*(MS.getmainlistPtr(cx*MS.getboardY()*MS.getboardZ()+cy*MS.getboardZ()+cz))).setlabel(std::to_string(MS.getvisual(cx,cy,cz)));
                         (*(MS.getmainlistPtr(cx*MS.getboardY()*MS.getboardZ()+cy*MS.getboardZ()+cz))).setcolor(cellColor(MS.getvisual(cx,cy,cz)));
                     }
                     
@@ -959,7 +967,7 @@ void mouse_callback(int event,int x,int y,int flags,void *userdata)
     if(event==cv::EVENT_RBUTTONUP){
         MS.setmouseDownFlag(false);
         if(!MS.getlongPressFlag()){
-            int cx,cy,cz;
+            std::int8_t cx,cy,cz;
             cx=MS.getcursor(0);
             cy=MS.getcursor(1);
             cz=MS.getcursor(2);
@@ -973,7 +981,7 @@ void mouse_callback(int event,int x,int y,int flags,void *userdata)
         }
         MS.setlongPressFlag(false);
         if(MS.getgameover()){
-            std::cout<<">>>game over<<<"<<endl;   
+            std::cout<<">>>game over<<<"<<std::endl;   
         }
     }
     if(event==cv::EVENT_MOUSEMOVE){
@@ -1003,9 +1011,8 @@ void mouse_callback(int event,int x,int y,int flags,void *userdata)
     }
 }
 
-void gameDisplay()
-{
-    for(int gumi=0;true;){
+void gameDisplay(){
+while(1){
     
     cv::Mat img(cv::Size(MS.getCANVAS_WIDTH(),2*MS.getCANVAS_HEIGHT()),CV_8UC3,cv::Scalar(0,0,0));
     
@@ -1013,10 +1020,10 @@ void gameDisplay()
     putText(img,"E:Easy ",cv::Point(10,70),1,1.2,cv::Scalar(0xfe,0xfe,0xfe));
     putText(img,"N:Normal",cv::Point(10,100),1,1.2,cv::Scalar(0xfe,0xfe,0xfe)); 
     putText(img,"H:Hard",cv::Point(10,130),1,1.2,cv::Scalar(0xfe,0xfe,0xfe));
-    putText(img,"Flag : "+to_string(flagCounter()),cv::Point(10,200),1,1.2,cv::Scalar(0xfe,0xfe,0xfe));
-    putText(img,"Time : "+to_string(MS.gettime()),cv::Point(10,230),1,1.2,cv::Scalar(0xfe,0xfe,0xfe));
+    putText(img,"Flag : "+std::to_string(flagCounter()),cv::Point(10,200),1,1.2,cv::Scalar(0xfe,0xfe,0xfe));
+    putText(img,"Time : "+std::to_string(MS.gettime()),cv::Point(10,230),1,1.2,cv::Scalar(0xfe,0xfe,0xfe));
     
-    vector<Cell> sortlist;
+    std::vector<Cell> sortlist;
     for(int i=0;i<MS.getmainlistAll().size();i++){
         sortlist.push_back((*(MS.getmainlistPtr(i))));
     }
@@ -1033,7 +1040,8 @@ void gameDisplay()
 
     for(int i=0;i<MS.getboardX()*MS.getboardY()*MS.getboardZ();i++){
 	    double fy,fz,fr;
-        int oy,oz,size;
+        std::int16_t oy,oz;
+        std::int8_t size;
         fy=sortlist[i].gety();
         fz=sortlist[i].getz();
         fr=1+sortlist[i].getx()/300;
@@ -1043,7 +1051,7 @@ void gameDisplay()
         if(fr>0.0&&fr<2.0
         &&fy*fr+oy>size&&fy*fr+oy<MS.getCANVAS_WIDTH()-size
         &&fz*fr+oz>size&&fz*fr+oz<MS.getCANVAS_HEIGHT()-size){
-            int vx,vy,vz;
+            std::int8_t vx,vy,vz;
             cv::Scalar cellcolor;
             bool onCursor;
 
@@ -1058,9 +1066,9 @@ void gameDisplay()
                 cellcolor=cv::Scalar(0xff,0xff,0xff);
             }else{
                 if(!MS.getdemined(vx,vy,vz)){
-                    int R=fr*10*10+44;
-                    int G=fr*10*10;
-                    int B=fr*10*10+22;
+                    unsigned short R=fr*10*10+44;
+                    unsigned short G=fr*10*10;
+                    unsigned short B=fr*10*10+22;
 
                     cellcolor=cv::Scalar(B,G,R);
                 }
@@ -1077,7 +1085,7 @@ void gameDisplay()
                 if(MS.getvisual(vx,vy,vz)==0){
                     celltext="";
                 }else{
-                    celltext=to_string(MS.getvisual(vx,vy,vz));
+                    celltext=std::to_string(MS.getvisual(vx,vy,vz));
                 }
             }else{
                 celltext="error";
@@ -1091,14 +1099,15 @@ void gameDisplay()
                 putText(img,celltext,cv::Point(fy*fr+oy,fz*fr+oz),1,0.8,cv::Scalar(20,20,20));
                 
                 if(MS.getgameclear()){
-                    putText(img,"GAME CLEAR",cv::Point(MS.getCANVAS_WIDTH()/2,MS.getCANVAS_HEIGHT()/2),1,3.0,cv::Scalar(100,100,100));
+                    putText(img,"GAME CLEAR",cv::Point(MS.getCANVAS_WIDTH()*3/8,MS.getCANVAS_HEIGHT()/2),1,3.0,cv::Scalar(140,170,160),2);
                 }else if(MS.getgameover()){
-                    putText(img,"GAME OVER",cv::Point(MS.getCANVAS_WIDTH()/2,MS.getCANVAS_HEIGHT()/2),1,3.0,cv::Scalar(100,100,100));
+                    putText(img,"GAME OVER",cv::Point(MS.getCANVAS_WIDTH()*3/8,MS.getCANVAS_HEIGHT()/2),1,3.0,cv::Scalar(70,100,90),2);
                 }
             }
         }
     }
 
+    //controller
     for(int i=0;i<6;i++){
         for(int j=i+1;j<6;j++){
             if((*(MS.getcontrollerlistPtr(i))).getx()>(*(MS.getcontrollerlistPtr(j))).getx()){
@@ -1111,7 +1120,8 @@ void gameDisplay()
 
     for(int i=0;i<6;i++){
         double cy,cz,cr,size;
-        int oy,oz,R,G,B;
+        std::int16_t oy,oz;
+        unsigned short R,G,B;
 
         cy=(*(MS.getcontrollerlistPtr(i))).gety();
         cz=(*(MS.getcontrollerlistPtr(i))).getz();
@@ -1159,7 +1169,7 @@ void gameDisplay()
     
     img.cv::Mat::release();
 
-    switch(cv::waitKey(100)){
+    switch(cv::waitKey(33)){
         case 101://easy
             modeChange(0);
             break;
@@ -1179,12 +1189,18 @@ void gameDisplay()
 }
 }
 
-int main( int argc, char** argv )
-{ 
-	std::thread th_main(gameInitialize);
-    std::thread th_time(timeCounter);
+void start(){
+ 	std::thread th_main(TDMineSweeper::gameInitialize);
+    std::thread th_time(TDMineSweeper::timeCounter);
     
     th_main.join();
     th_time.join(); 
+}
+
+};
+
+int main( int argc, char** argv )
+{ 
+    TDMineSweeper::start();
     return 0;
 }
