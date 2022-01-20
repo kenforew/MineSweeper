@@ -15,7 +15,9 @@
 #include <thread>
 
 #include "vec_op.hpp"
+#include "phy_op.hpp"
 #include "const.hpp"
+
 
 #include <opencv2/opencv.hpp>
 
@@ -33,6 +35,8 @@ private:
     bool frameFlag;
 
     std::uint16_t spf;
+    
+
 public:
     GrobalVariables(){
         CANVAS_WIDTH=800;
@@ -74,6 +78,7 @@ public:
     std::uint16_t getspf(){
         return spf;
     }
+
 };
 
 GrobalVariables GV;
@@ -86,35 +91,14 @@ private:
     //一般座標 x=x1+xg,y=y1+yg
     double m,e,sfc,dfc,w,I,Ig,If;
     //static friction coefficient // dynamic friction coefficient
-    bool stop,joint;
+    bool stop,joint,motion;
+    std::vector<double> r_s;
+    double th_s;
+
 public:
     Triangle(std::vector<std::vector<double>>cc,double mm,double ee,double ssfc,double ddfc,double ww,std::vector<double>vv){
         double xg,yg;
-        //x1=cc[0][0];y1=cc[0][1];x2=cc[1][0];y2=cc[1][1];x3=cc[2][0];y3=cc[2][1];
-        
-        //xg=(x1+x2+x3)/3;yg=(y1+y2+y3)/3;
-        //g={xg,yg};
-        
-        //x1=x1-xg;x2=x2-xg;x3=x3-xg;
-        //y1=y1-yg;y2=y2-yg;y3=y3-yg;
-        
-        //xlist={x1,x2,x3};
-
-        //ylist={y1,y2,y3};
-
-        //corner={
-        //    {x1,y1},
-        //    {x2,y2},
-        //    {x3,y3}
-        //};
-
-        //m=mm;e=ee,sfc=ssfc,dfc=ddfc,w=ww;v=vv;
-        
-        //I=m/18.0*(
-        //    (x1*x1)+(y1*y1)+(x2*x2)+(y2*y2)+(x3*x3)+(y3*y3)
-        //    -(x1*x2)-(y1*y2)-(x2*x3)-(y2*y3)-(x3*x1)-(y3*y1)
-        //);
-        
+       
         xg=0;yg=0;
         for(int i=0;i<cc.size();i++){
             xg+=cc[i][0];
@@ -132,7 +116,11 @@ public:
             corner.push_back(cc[i]-g);
         }
 
-        m=mm;e=ee,sfc=ssfc,dfc=ddfc,w=ww;v=vv;
+        m=mm;
+        e=ee;
+        if(e>1.0)e=1.0;
+        if(e<0.0)e=0.0;
+        sfc=ssfc,dfc=ddfc,w=ww;v=vv;
         
         I=0;
         for(int i=0;i<corner.size();i++){
@@ -143,6 +131,10 @@ public:
         stop=false;
         
         joint=false;
+
+        motion=true;
+        r_s={0.0,0.0};
+        th_s=0.0;
     }
 
     Triangle(std::vector<std::vector<double>>cc,double mm,double ee,double ssfc,double ddfc,double ww,std::vector<double> vv,std::vector<double>jj){
@@ -245,6 +237,15 @@ public:
     std::vector<double> getfix(){
         return fix;
     }
+    bool getmotion(){
+        return motion;
+    }
+    std::vector<double> getr_s(){
+        return r_s;
+    }
+    double getth_s(){
+        return th_s;
+    }
 
     void setG(std::vector<double> gg){
         g=gg;
@@ -266,6 +267,15 @@ public:
     void setfix(std::vector<double>ff){
         fix=ff;
     }
+    void setmotion(bool mm){
+        motion=mm;
+    }
+    void setr_s(std::vector<double> rr){
+        r_s=rr;
+    }
+    void setth_s(double tt){
+        th_s=tt;
+    }
     
     void VWUpdate(double);
     void PosUpdate(double);
@@ -282,10 +292,12 @@ public:
     void shiftColPos(std::vector<double>);
     bool AABB(Triangle *);
     double distDots(std::vector<double>,std::vector<double>);
-    double distLine(std::vector<double>,std::vector<double>,std::vector<double>);    
+    double distLine(std::vector<double>,std::vector<double>,std::vector<double>);
+    double distLineSegment(std::vector<double>,std::vector<double>,std::vector<double>);
+    double signedDistLine(std::vector<double>,std::vector<double>,std::vector<double>);
     std::vector<double> getNVector(std::vector<double>,std::vector<double>,std::vector<double>);
     std::vector<double> GJK_EPA_force(Triangle *);
-    void Collision(Triangle *);
+    void Contact(Triangle *);
     void addJoint(std::vector<double>);
     void removeJoint();
 
@@ -296,6 +308,21 @@ void Triangle::VWUpdate(double ratio){
 }
 void Triangle::PosUpdate(double ratio){
     g=g+ratio*v;
+
+    //二次元多様体
+    //if(g[0]<-GV.getCW()/2){
+    //    g[0]=g[0]+GV.getCW();
+    //}
+    //if(g[0]>GV.getCW()/2){
+    //    g[0]=g[0]-GV.getCW();
+    //}
+    //if(g[1]<-GV.getCH()/2){
+    //    g[1]=g[1]+GV.getCH();
+    //}
+    //if(g[1]>GV.getCH()/2){
+    //    g[1]=g[1]-GV.getCH();
+    //}
+
 }
 
 void Triangle::RotUpdate(double ratio){
@@ -314,9 +341,9 @@ void Triangle::RotUpdate(double ratio){
 }
 
 void Triangle::update(){
-    VWUpdate(1.0);
-    PosUpdate(1.0);
-    RotUpdate(1.0);
+    VWUpdate(0.9);
+    PosUpdate(0.9);
+    RotUpdate(0.9);
 }
 
 void Triangle::JointWUpdate(double ratio){
@@ -356,9 +383,9 @@ void Triangle::JointRotUpdate(double ratio){
 }
 
 void Triangle::Jointupdate(){
-    JointWUpdate(1.0);
-    JointPosUpdate(1.0);
-    JointRotUpdate(1.0);
+    JointWUpdate(0.9);
+    JointPosUpdate(0.9);
+    JointRotUpdate(0.9);
 }
 
 
@@ -401,12 +428,48 @@ double Triangle::distLine(std::vector<double> p1,std::vector<double> p2,std::vec
     double b,t;
     b=vec_op::dot(dv,p1)-vec_op::dot(dv,q);
     t=-b/a;
+    //if(t<0.0)t=0.0;
+    //if(t>1.0)t=1.0;
+    std::vector<double> ans=p1+t*dv;
+
+    return vec_op::norm(ans-q);
+}
+double Triangle::distLineSegment(std::vector<double> p1,std::vector<double> p2,std::vector<double> q){
+    double a;
+    std::vector<double> dv=p2-p1;
+    a=vec_op::dot(dv,dv);
+
+    if(a==0){
+        return vec_op::norm(p1-q);
+    }
+    double b,t;
+    b=vec_op::dot(dv,p1)-vec_op::dot(dv,q);
+    t=-b/a;
     if(t<0.0)t=0.0;
     if(t>1.0)t=1.0;
     std::vector<double> ans=p1+t*dv;
 
     return vec_op::norm(ans-q);
 }
+double Triangle::signedDistLine(std::vector<double> p1,std::vector<double> p2,std::vector<double> q){
+    double a,cross;
+    std::vector<double> dv=p2-p1;
+    a=vec_op::dot(dv,dv);
+
+    if(a==0){
+        return vec_op::norm(p1-q);
+    }
+    double b,t;
+    b=vec_op::dot(dv,p1)-vec_op::dot(dv,q);
+    t=-b/a;
+    //if(t<0.0)t=0.0;
+    //if(t>1.0)t=1.0;
+    std::vector<double> ans=p1+t*dv;
+
+    cross=vec_op::cross_2(dv,ans-q);
+    return cross/abs(cross)*vec_op::norm(ans-q);
+}
+
 std::vector<double> Triangle::getNVector(std::vector<double> p1,std::vector<double> p2,std::vector<double> q){
     double a;
     std::vector<double> dv=p2-p1;
@@ -425,7 +488,7 @@ std::vector<double> Triangle::getNVector(std::vector<double> p1,std::vector<doub
 }
 
 std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
-    std::cout<<"GJK EPA force is called."<<std::endl;
+    //std::cout<<"GJK EPA force is called."<<std::endl;
     bool goEPAFlag=false;
 
     std::vector<double> AtoO=(-1.0)*g,xnew={0.0,0.0};//01
@@ -479,7 +542,7 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
     //ここまでで最初の二点を vector<double> triangle に格納
 
     
-    std::cout<<"line segment two nodes : ("<<triangle[0][0]<<" "<<triangle[0][1]<<") ("<<triangle[1][0]<<" "<<triangle[1][1]<<")"<<std::endl;
+    //std::cout<<"line segment two nodes : ("<<triangle[0][0]<<" "<<triangle[0][1]<<") ("<<triangle[1][0]<<" "<<triangle[1][1]<<")"<<std::endl;
 
     //triangle : vector from (x,y) to (0,0) coordinate:(x,y)<=>vector:(-x,-y)
     std::vector<double> second=getNVector((-1.0)*triangle[0],(-1.0)*triangle[1],{0.0,0.0});//04
@@ -487,7 +550,7 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
     //AtoO[0]=-second[0];
     //AtoO[1]=-second[1];//05
     AtoO=(-1.0)*second;
-    std::cout<<"n vector from IS to O : "<<AtoO[0]<<" "<<AtoO[1]<<std::endl;
+    //std::cout<<"n vector from IS to O : "<<AtoO[0]<<" "<<AtoO[1]<<std::endl;
     //交点から原点に向かうベクトルを作成
     //
     //dda=(xlist[0]+getG()[0])*AtoO[0]+(ylist[0]+getG()[1])*AtoO[1];
@@ -580,7 +643,7 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
                 v12=getNVector((-1.0)*triangle[2],(-1.0)*triangle[1],{0.0,0.0}),
                 v20=getNVector((-1.0)*triangle[0],(-1.0)*triangle[2],{0.0,0.0});
             
-            std::cout<<"nearest vector from O to LS v01,v12,v20 : "<<v01[0]<<" "<<v01[1]<<" "<<v12[0]<<" "<<v12[1]<<" "<<v20[0]<<" "<<v20[1]<<std::endl;
+            //std::cout<<"nearest vector from O to LS v01,v12,v20 : "<<v01[0]<<" "<<v01[1]<<" "<<v12[0]<<" "<<v12[1]<<" "<<v20[0]<<" "<<v20[1]<<std::endl;
             //三角形の各辺に対する原点からの最近接ベクトル
 
             std::vector<std::vector<double>> vlist={v01,v12,v20};
@@ -598,7 +661,7 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
             //AtoO[0]=-vlist[vlistindex][0];
             //AtoO[1]=-vlist[vlistindex][1];//-? +? (-)=>(+)
             AtoO=(-1.0)*vlist[vlistindex];
-            std::cout<<"shortest vector from O to LS : "<<AtoO[0]<<" "<<AtoO[1]<<std::endl;
+            //std::cout<<"shortest vector from O to LS : "<<AtoO[0]<<" "<<AtoO[1]<<std::endl;
         
             //dda=(xlist[0]+getG()[0])*AtoO[0]+(ylist[1]+getG()[1])*AtoO[1];
             dda=vec_op::dot(getcorner()[0]+getG(),AtoO);
@@ -630,7 +693,7 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
 
             //cout<<"AU-B corner A(x,y),B(x,y) : "<<xlist[ai]<<" "<<ylist[ai]<<" "<<B.getxlist()[bi]<<" "<<B.getylist()[bi]<<endl;
             xnew=(-1.0)*(getcorner()[ai]+getG())+((*B).getcorner()[bi]+(*B).getG());
-            std::cout<<"4 th node : "<<xnew[0]<<" "<<xnew[1]<<std::endl;
+            //std::cout<<"4 th node : "<<xnew[0]<<" "<<xnew[1]<<std::endl;
             //cout<<"index ai,bi,da,db: "<<ai<<" "<<bi<<" "<<dda<<" "<<ddb<<endl;
             triangle.push_back(xnew);//4th node is added.
 
@@ -670,21 +733,21 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
                 break;
             }
             
-            std::cout<<"all nodes of triangle ... "<<std::endl;
-            for(int i=0;i<triangle.size();i++){
-                std::cout<<i<<" th node : "<<triangle[i][0]<<" "<<triangle[i][1]<<std::endl;
-            }
+            //std::cout<<"all nodes of triangle ... "<<std::endl;
+            //for(int i=0;i<triangle.size();i++){
+            //    std::cout<<i<<" th node : "<<triangle[i][0]<<" "<<triangle[i][1]<<std::endl;
+            //}
         }            
     }
 
     //EPA algorithm -------------------------------------------------
     std::vector<double>force={0.0,0.0},escape={0.0,0.0};
-    std::cout<<"EPA start. init Triangle : "<<triangle[0][0]<<" "<<triangle[0][1]<<" "<<triangle[1][0]<<" "<<triangle[1][1]<<" "<<triangle[2][0]<<" "<<triangle[2][1]<<std::endl;
+    //std::cout<<"EPA start. init Triangle : "<<triangle[0][0]<<" "<<triangle[0][1]<<" "<<triangle[1][0]<<" "<<triangle[1][1]<<" "<<triangle[2][0]<<" "<<triangle[2][1]<<std::endl;
     bool goVWUpdateFlag=false;
-    std::cout<<"goEPAFlag : "<<goEPAFlag<<std::endl;
+    //std::cout<<"goEPAFlag : "<<goEPAFlag<<std::endl;
 
     if(goEPAFlag){
-        std::cout<<"enter EPA"<<std::endl;
+        //std::cout<<"enter EPA"<<std::endl;
     while(1){
         std::vector<double> distLineList;
         std::vector<std::vector<double>> nearestCoordinateList;
@@ -693,7 +756,7 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
         
         for(int i=0;i<t;i++){
             distLineList.push_back(
-                distLine(
+                distLineSegment(
                     (-1.0)*triangle[i],
                     (-1.0)*triangle[(i+1)%t],
                     {0.0,0.0}));
@@ -704,14 +767,14 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
                     {0.0,0.0}));
         }
 
-        std::cout<<"distLineList : "<<std::endl;
-        for(int i=0;i<distLineList.size();i++){
-            std::cout<<distLineList[i]<<std::endl;
-        }
-        std::cout<<"nearestCoordinateList"<<std::endl;
-        for(int i=0;i<nearestCoordinateList.size();i++){
-            std::cout<<i<<" th nc : "<<nearestCoordinateList[i][0]<<" "<<nearestCoordinateList[i][1]<<std::endl;
-        }
+        //std::cout<<"distLineList : "<<std::endl;
+        //for(int i=0;i<distLineList.size();i++){
+        //    std::cout<<distLineList[i]<<std::endl;
+        //}
+        //std::cout<<"nearestCoordinateList"<<std::endl;
+        //for(int i=0;i<nearestCoordinateList.size();i++){
+        //    std::cout<<i<<" th nc : "<<nearestCoordinateList[i][0]<<" "<<nearestCoordinateList[i][1]<<std::endl;
+        //}
 
         double mindist=distLineList[0];
         int index=0;
@@ -722,7 +785,7 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
                 index=i;
             }
         }
-        std::cout<<"index , nearest dist , coordinate : "<<index<<", "<<distLineList[index]<<", "<<nearestCoordinateList[index][0]<<" "<<nearestCoordinateList[index][1]<<std::endl;
+        //std::cout<<"index , nearest dist , coordinate : "<<index<<", "<<distLineList[index]<<", "<<nearestCoordinateList[index][0]<<" "<<nearestCoordinateList[index][1]<<std::endl;
 
         //AtoO[0]=nearestCoordinateList[index][0];
         //AtoO[1]=nearestCoordinateList[index][1];
@@ -736,19 +799,19 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
                     AtoO[0]=sgn*(triangle[(i+1)%t][1]-triangle[i][1]);
                     AtoO[1]=-sgn*(triangle[(i+1)%t][0]-triangle[i][0]);
                     force=0.0*force;
-                    std::cout<<"new AtoO is genereated. force={0.0,0.0}"<<std::endl;
+                    //std::cout<<"new AtoO is genereated. force={0.0,0.0}"<<std::endl;
                     break;
                 }
             }
         }
 
-        std::cout<<"vector from O to NC : "<<AtoO[0]<<" "<<AtoO[1]<<std::endl;
+        //std::cout<<"vector from O to NC : "<<AtoO[0]<<" "<<AtoO[1]<<std::endl;
 
         dda=vec_op::dot(getcorner()[0]+getG(),AtoO);
         ai=0;
         for(int i=0;i<ta;i++){
             da=vec_op::dot(getcorner()[i]+getG(),AtoO);
-            std::cout<<i<<" th da : "<<da<<std::endl;
+            //std::cout<<i<<" th da : "<<da<<std::endl;
             if(da>dda){
                 
                 dda=da;
@@ -759,20 +822,20 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
         bi=0;
         for(int i=0;i<tb;i++){
             db=vec_op::dot((*B).getcorner()[i]+(*B).getG(),AtoO);   //cout<<i<<" th db : "<<db<<endl;
-            std::cout<<i<<" th db : "<<db<<std::endl;
+            //std::cout<<i<<" th db : "<<db<<std::endl;
             if(db<ddb){
                 ddb=db;
                 bi=i;
             }
         }
         
-        for(int i=0;i<triangle.size();i++){
-            std::cout<<"triangle "<<i<<" th node : "<<triangle[i][0]<<" "<<triangle[i][1]<<std::endl;
-        }
+        //for(int i=0;i<triangle.size();i++){
+        //    std::cout<<"triangle "<<i<<" th node : "<<triangle[i][0]<<" "<<triangle[i][1]<<std::endl;
+        //}
 
         //minimize
         xnew=(-1.0)*(getcorner()[ai]+getG())+((*B).getcorner()[bi]+(*B).getG());
-        std::cout<<"xnew : "<<xnew[0]<<" "<<xnew[1]<<std::endl;
+        //std::cout<<"xnew : "<<xnew[0]<<" "<<xnew[1]<<std::endl;
         
         //xnew 閉曲線になる位置にpush
 
@@ -790,14 +853,14 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
                 insertindex=(i+1)%t;
                 force=(-1.0)*AtoO;
                 goVWUpdateFlag=true;
-                std::cout<<"same node is added break // force=-AtoO"<<std::endl;
+                //std::cout<<"same node is added break // force=-AtoO"<<std::endl;
                 samenodeFlag=true;
                 break;
             }
 
         }
         if(samenodeFlag){
-            std::cout<<"go out of while loop. same node flag"<<std::endl;
+            //std::cout<<"go out of while loop. same node flag"<<std::endl;
             break;
         }
 
@@ -806,7 +869,7 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
             if(sgn*((triangle[i%t][0]-xnew[0])*(-triangle[(i+1)%t][1]+triangle[i%t][1])-(triangle[i%t][1]-xnew[1])*(-triangle[(i+1)%t][0]+triangle[i%t][0]))<=0){
                 //理論上一回だけこの中に入る
                 //xnewがtriangle辺上にあるときは二回0を返す
-                std::cout<<i<<" th element is inserted"<<std::endl;
+                //std::cout<<i<<" th element is inserted"<<std::endl;
                 insertindex=(i+1)%t;
                 //if(triangle[i%t][0]==xnew[0]&&triangle[i%t][1]==xnew[1]){
                     //  insertindex=i%t;
@@ -816,7 +879,7 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
                 force=(-1.0)*AtoO;
                 //force[0]=-AtoO[0];
                 //force[1]=-AtoO[1];
-                std::cout<<"normal break force=-AtoO"<<std::endl;
+                //std::cout<<"normal break force=-AtoO"<<std::endl;
                 break;
             }
         } 
@@ -831,42 +894,42 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
         //cout<<"inserindex : "<<insertindex<<endl;
         t=triangle.size();
 
-        for(int i=0;i<triangle.size();i++){
-            std::cout<<"triangle "<<i<<" th node : "<<triangle[i][0]<<" "<<triangle[i][1]<<std::endl;
-        }
+        //for(int i=0;i<triangle.size();i++){
+        //    std::cout<<"triangle "<<i<<" th node : "<<triangle[i][0]<<" "<<triangle[i][1]<<std::endl;
+        //}
 
 
         if(t>10||distDots(escape,xnew)<1){
             force=(-1.0)*AtoO;
-            std::cout<<"convergent // force=-AtoO"<<std::endl;
+            //std::cout<<"convergent // force=-AtoO"<<std::endl;
             goVWUpdateFlag=true;
             break;
         }
         
         escape=xnew;
 
-        std::cout<<"final dda,ddb : "<<dda<<" "<<ddb<<std::endl;
+        //std::cout<<"final dda,ddb : "<<dda<<" "<<ddb<<std::endl;
         
     }
     }
-    std::cout<<"GJK EPA force is over. force : "<<force[0]<<" "<<force[1]<<std::endl;
+    //std::cout<<"GJK EPA force is over. force : "<<force[0]<<" "<<force[1]<<std::endl;
     return force;
 }
 
-void Triangle::Collision(Triangle *B){
+void Triangle::Contact(Triangle *B){
     //cout<<"GJK reffers the address : "<<B<<endl;
     std::vector<double> collision,nearestDot,force={0.0,0.0};
     bool vwHasChanged=false;
     std::vector<std::vector<double>>Qnlist,ralist,rblist;
     
-    for(int bbb=0;bbb<2;bbb++){
+    for(int bbb=0;bbb<1;bbb++){
         
     force=GJK_EPA_force(B);
-    std::cout<<"force : "<<force[0]<<" "<<force[1]<<std::endl;
+    //std::cout<<"force : "<<force[0]<<" "<<force[1]<<std::endl;
     if(vec_op::norm(force)==0.0){
-        std::cout<<"force is 0. A pos is "<<getG()[0]<<" "<<getG()[1]<<std::endl;
+        //std::cout<<"force is 0. A pos is "<<getG()[0]<<" "<<getG()[1]<<std::endl;
         if(bbb>0){
-            std::cout<<"loop is over. bbb : "<<bbb<<std::endl;
+            //std::cout<<"loop is over. bbb : "<<bbb<<std::endl;
             if(getstop()){
                 PosUpdate(-1.0*bbb);
                 RotUpdate(-1.0);
@@ -899,25 +962,26 @@ void Triangle::Collision(Triangle *B){
         //cout<<"before shift G x,y : "<<getG()[0]<<" "<<getG()[1]<<endl;
         //set v,w 
         if(!getstop()&&!getjoint()){
+            //std::cout<<"A original Pos : "<<getG()[0]<<" "<<getG()[1]<<std::endl;
             shiftColPos(1.1*force);
         }
         //cout<<"after shift G x,y : "<<getG()[0]<<" "<<getG()[1]<<endl;
 
         if(!(*B).getstop()&&!(*B).getjoint()){
             //std::vector<double> minusf={-force[0]*1.1,-force[1]*1.1};
-            (*B).shiftColPos((-1.0)*force);
+            (*B).shiftColPos((-1.1)*force);
         }
 
         short ta=getxlist().size();
         short tb=(*B).getxlist().size();
         
-        double len,minlen=distLine(getcorner()[0]+getG(),getcorner()[1]+getG(),(*B).getcorner()[0]+(*B).getG());
+        double len,minlen=distLineSegment(getcorner()[0]+getG(),getcorner()[1]+getG(),(*B).getcorner()[0]+(*B).getG());
         short ia=0,ib=0;
         char x='a';//xlist 's owner...a or b
         
         for(int i=0;i<ta;i++){
             for(int j=0;j<tb;j++){
-                len=distLine(getcorner()[i]+getG(),getcorner()[(i+1)%ta]+getG(),(*B).getcorner()[j]+(*B).getG());
+                len=distLineSegment(getcorner()[i]+getG(),getcorner()[(i+1)%ta]+getG(),(*B).getcorner()[j]+(*B).getG());
                 if(len<minlen){
                     minlen=len;
                     ia=i;
@@ -932,7 +996,7 @@ void Triangle::Collision(Triangle *B){
 
         for(int i=0;i<tb;i++){
             for(int j=0;j<ta;j++){
-                len=distLine((*B).getcorner()[i]+(*B).getG(),(*B).getcorner()[(i+1)%ta]+(*B).getG(),getcorner()[j]+getG());
+                len=distLineSegment((*B).getcorner()[i]+(*B).getG(),(*B).getcorner()[(i+1)%ta]+(*B).getG(),getcorner()[j]+getG());
                 if(len<minlen){
                     minlen=len;
                     ia=j;
@@ -960,12 +1024,16 @@ void Triangle::Collision(Triangle *B){
 
         if(!getstop()&&!getjoint()){
             shiftColPos(collision);
+            shiftColPos((-1.0)*force);
         }
         if(!(*B).getstop()&&!(*B).getjoint()){
             (*B).shiftColPos((-1.0)*collision);
+            (*B).shiftColPos(force);
         }
 
         //update v,w
+
+
         
         
         double Q,a,b;//v_ab ... relative velocity
@@ -981,45 +1049,385 @@ void Triangle::Collision(Triangle *B){
         //nn...法線ベクトル
         //hh...接線ベクトル        
         
-        std::cout<<"ra,rb : ("<<ra[0]<<" "<<ra[1]<<") ("<<rb[0]<<" "<<rb[1]<<")"<<std::endl;
+        //std::cout<<"ra,rb : ("<<ra[0]<<" "<<ra[1]<<") ("<<rb[0]<<" "<<rb[1]<<")"<<std::endl;
 
-        if(
-            !getstop()
-            &&vec_op::norm(getV())<1.0//remember 
-            &&getW()*getW()<0.01//remember
-        ){
-            std::cout<<"A anteika--------------------"<<std::endl;
-            //setstop(1);
-        }
-        if(
-            !(*B).getstop()
-            &&vec_op::norm((*B).getV())<1.0
-            &&(*B).getW()*(*B).getW()<0.01
-        ){
-            std::cout<<"B anteika--------------------"<<std::endl;
-            //(*B).setstop(1);
-        }
-        
+        //if(
+        //    !getstop()
+        //    &&vec_op::norm(getV())<0.1//remember 
+        //    &&getW()*getW()<0.01//remember
+        //){
+        //    std::cout<<"A anteika--------------------"<<std::endl;
+        //    setstop(1);
+        //}
+        //if(
+        //    !(*B).getstop()
+        //    &&vec_op::norm((*B).getV())<0.1
+        //    &&(*B).getW()*(*B).getW()<0.01
+        //){
+        //    std::cout<<"B anteika--------------------"<<std::endl;
+        //    (*B).setstop(1);
+        //}
+
         a=(vec_op::dot(ra,ra)-pow(vec_op::dot(ra,nn),2))/getI();
         b=(vec_op::dot(rb,rb)-pow(vec_op::dot(rb,nn),2))/(*B).getI();
         Q=(1+getE()*(*B).getE())*(v_ab[0]*nn[0]+v_ab[1]*nn[1])/(1/getM()+1/(*B).getM()+a+b);
 
-        if(!getstop()&&bbb==0){
+        //add Spring and dumper to Q
+        phy_op::spring;
+        std::vector<double> NDtoG;
+        if(x=='a'){
+            NDtoG=(*B).getG()-(nearestDot+collision);
+        }else if(x=='b'){
+            NDtoG=getG()-(nearestDot+collision);
+        }
+        //std::cout<<"NDtoG : "<<NDtoG[0]<<" "<<NDtoG[1]<<std::endl;
+        NDtoG=(1/vec_op::norm(NDtoG))*NDtoG;
+        //std::cout<<"NDtoG : "<<NDtoG[0]<<" "<<NDtoG[1]<<std::endl;
+        //std::cout<<"coefficient : "<<vec_op::dot((0.5)*force,NDtoG)<<std::endl;
+        std::vector<double> origin=nearestDot+collision-force+vec_op::dot((0.5)*force,NDtoG)*NDtoG;//共通部分内部の点
+        //std::cout<<"A second Pos : "<<getG()[0]<<" "<<getG()[1]<<std::endl;
+        //std::cout<<"origin : "<<origin[0]<<" "<<origin[1]<<std::endl;
+        //std::cout<<"nearestDot : "<<nearestDot[0]<<" "<<nearestDot[1]<<std::endl;
+        //std::cout<<"collision : "<<collision[0]<<" "<<collision[1]<<std::endl;
+        //std::cout<<"force : "<<force[0]<<" "<<force[1]<<std::endl;
+        //for(int i=0;i<3;i++){
+        //    std::cout<<"A,B : "<<getcorner()[i][0]+getG()[0]<<" "<<getcorner()[i][1]+getG()[1]<<" "<<(*B).getcorner()[i][0]+(*B).getG()[0]<<" "<<(*B).getcorner()[i][1]+(*B).getG()[1]<<std::endl;
+        //}
+        
+        std::vector<std::vector<double>> convexlist;
+        for(int i=0;i<ta;i++){
+            double a,b,c,d;
+            a=getcorner()[i][0]+getG()[0]-origin[0];
+            b=getcorner()[i][1]+getG()[1]-origin[1];
+            c=getcorner()[(i+1)%ta][0]+getG()[0]-origin[0];
+            d=getcorner()[(i+1)%ta][1]+getG()[1]-origin[1];
+            //a=2;b=0;c=0;d=2;
+            //std::cout<<"a,b,c,d : "<<a<<" "<<b<<" "<<c<<" "<<d<<std::endl;
+            double det=a*d-b*c;
+            if(det!=0){
+                double aa,bb;//a..直線の傾き b..切片
+                aa=(d-b)/det;
+                bb=(-c+a)/det;
+                //std::cout<<"aa,bb : "<<aa<<" "<<bb<<std::endl;
+                convexlist.push_back({aa,bb});
+                //std::cout<<"a,b : "<<aa<<" "<<bb<<std::endl;
+            }
+        }
+        for(int i=0;i<tb;i++){
+            double a,b,c,d;
+            a=(*B).getcorner()[i][0]+(*B).getG()[0]-origin[0];
+            b=(*B).getcorner()[i][1]+(*B).getG()[1]-origin[1];
+            c=(*B).getcorner()[(i+1)%tb][0]+(*B).getG()[0]-origin[0];
+            d=(*B).getcorner()[(i+1)%tb][1]+(*B).getG()[1]-origin[1];
+            
+            //std::cout<<"a,b,c,d : "<<a<<" "<<b<<" "<<c<<" "<<d<<std::endl;
+            double det=a*d-b*c;
+            if(det!=0){
+                double aa,bb;
+                aa=(d-b)/det;
+                bb=(-c+a)/det;
+                //std::cout<<"aa,bb : "<<aa<<" "<<bb<<std::endl;
+                convexlist.push_back({aa,bb});
+                //std::cout<<"a,b : "<<aa<<" "<<bb<<std::endl;
+            }
+        }
+
+        //for(int i=0;i<convexlist.size();i++){
+        //    std::cout<<i<<" th convexlist element : "<<convexlist[i][0]<<" "<<convexlist[i][1]<<std::endl;
+        //}
+
+
+        int maxindex=0;
+        double maxX=convexlist[0][0];
+        for(int i=1;i<convexlist.size();i++){
+            if(maxX<convexlist[i][0]){
+                maxX=convexlist[i][0];
+                maxindex=i;
+            }
+        }
+
+        //std::cout<<"maxindex: "<<maxindex<<std::endl;
+        std::vector<std::vector<double>> minconvexlist;
+        std::vector<int> minconvexindexlist;
+        minconvexlist.push_back(convexlist[maxindex]);
+        minconvexindexlist.push_back(maxindex);
+        std::vector<double> branch=minconvexlist[0];
+        int minconvexindex=maxindex;
+        bool loop=true;
+
+        while(loop){
+            for(int j=0;j<convexlist.size();j++){
+                if(j!=minconvexindex){
+                    bool flag=true;
+                    for(int k=0;k<convexlist.size();k++){
+                        if(j!=k&&vec_op::cross_2(convexlist[j]-branch,convexlist[k]-branch)<0){                        
+                            flag=false;
+                            //外積負の点が一つでもあればそこで強制終了
+                            break;
+                        }
+                    }
+                    if(flag){
+                        if(convexlist[j][0]==minconvexlist[0][0]&&convexlist[j][1]==minconvexlist[0][1]){
+                            //reach first node 
+                            loop=false;
+                            break;
+                        }else{
+                            minconvexlist.push_back(convexlist[j]);
+                            minconvexindex=j;
+                            //std::cout<<"new convexlist : "<<convexlist[j][0]<<" "<<convexlist[j][1]<<std::endl;
+                            branch=convexlist[j];
+                            //std::cout<<"minconvexindex : "<<minconvexindex<<std::endl;
+                        }
+                    }
+                }
+            }
+        }        
+        
+        //for(int i=0;i<minconvexlist.size();i++){
+        //    std::cout<<i<<" th minconvexlist : "<<minconvexlist[i][0]<<" "<<minconvexlist[i][1]<<std::endl;
+        //}
+
+        std::vector<std::vector<double>> intersection;
+        int tc=minconvexlist.size();
+        for(int i=0;i<tc;i++){
+            double a,b,c,d;
+            a=minconvexlist[i][0];
+            b=minconvexlist[i][1];
+            c=minconvexlist[(i+1)%tc][0];
+            d=minconvexlist[(i+1)%tc][1];
+            
+            //std::cout<<"a,b,c,d : "<<a<<" "<<b<<" "<<c<<" "<<d<<std::endl;
+            double det=a*d-b*c;
+            if(det!=0){
+                double aa,bb;
+                aa=(d-b)/det;
+                bb=(-c+a)/det;
+                intersection.push_back({aa,bb});
+            }
+        }
+        
+        //for(int i=0;i<intersection.size();i++){
+        //    std::cout<<"intersection : "<<intersection[i][0]<<" "<<intersection[i][1]<<std::endl;
+        //}
+
+        std::vector<std::vector<double>> iscorner;
+        int ti=intersection.size();
+        for(int i=0;i<ti;i++){
+            //double a,b,c,d;
+            //a/=intersection[i][0];
+            //b=intersection[i][1];
+            //c=intersection[(i+1)%ti][0];
+            //d=intersection[(i+1)%ti][1];            
+            //iscorner.push_back({-(b-d)/(a-c),-a*(b-d)/(a-c)+b});
+            iscorner.push_back(intersection[i]+origin);    
+        }
+        
+        //for(int i=0;i<iscorner.size();i++){
+        //    std::cout<<"iscorner : "<<iscorner[i][0]<<" "<<iscorner[i][1]<<std::endl;
+        //}
+
+        std::vector<double> f_Ns={0.0,0.0},f_Nd={0.0,0.0},f_D={0.0,0.0},f_Ss={0.0,0.0},f_Sd={0.0,0.0},f_M={0.0,0.0};//Force N of Spring, Force N of Dumper
+        double Am_Ns=0.0,Bm_Ns=0.0,Am_Nd=0.0,Bm_Nd=0.0,Am_D=0.0,Bm_D=0.0,Am_Ss=0.0,Bm_Ss=0.0,Am_Sd=0.0,Bm_Sd=0.0,Am_M=0.0,Bm_M=0.0;
+        //std::vector<double> m_ns={0.0,0.0},m_nd={0.0,0.0};
+        
+        std::vector<double>hlist;
+        std::vector<std::vector<double>>vlist,vnlist,vtlist;
+        std::vector<std::vector<double>>f_Nlist,f_Dlist,f_Slist;
+
+        std::vector<double>AcntrVel,AfixedPos,BcntrVel,BfixedPos;
+        for(int i=0;i<ti;i++){
+            hlist.push_back(signedDistLine(nearestDot+collision-(0.5)*force,nearestDot+collision-(0.5)*force+hh,iscorner[i]));
+            if(getjoint()){
+                AcntrVel={0.0,0.0};
+                AfixedPos=getfix();
+            }else{
+                AcntrVel=getV();
+                AfixedPos=getG();
+            }
+            if((*B).getjoint()){
+                BcntrVel={0.0,0.0};
+                BfixedPos=(*B).getfix();
+            }else{
+                BcntrVel=(*B).getV();
+                BfixedPos=(*B).getG();
+            }
+            vlist.push_back(
+                {
+                    AcntrVel[0]-(iscorner[i][1]-AfixedPos[1])*getW()-(BcntrVel[0]-(iscorner[i][1]-BfixedPos[1])*(*B).getW()),
+                    AcntrVel[1]+(iscorner[i][0]-AfixedPos[0])*getW()-(BcntrVel[1]-(iscorner[i][0]-BfixedPos[0])*(*B).getW())
+                }
+            );
+        }
+        for(int i=0;i<ti;i++){
+            vnlist.push_back(vec_op::dot(vlist[i],nn)*nn);
+        }
+        for(int i=0;i<ti;i++){
+            vtlist.push_back(vlist[i]-vnlist[i]);
+        }
+
+        //for(int i=0;i<ti;i++){
+        //    std::cout<<i<<" th hlist : "<<hlist[i]<<std::endl
+        //            <<i<<" th vlist : "<<vlist[i][0]<<" "<<vlist[i][1]<<std::endl
+        //            <<i<<" th vnlist : "<<vnlist[i][0]<<" "<<vnlist[i][1]<<std::endl
+        //            <<i<<" th vtlist : "<<vtlist[i][0]<<" "<<vtlist[i][1]<<std::endl;
+        //}
+
+        for(int i=0;i<ti;i++){
+            double L=vec_op::norm(iscorner[(i+1)%ti]-iscorner[i]);
+            //L=1.0;
+            std::vector<double> f_Ns_sub=phy_op::spring*L*(0.5)*(hlist[i]+hlist[(i+1)%ti])*nn;
+            f_Ns=f_Ns+f_Ns_sub;
+            
+            Am_Ns+=phy_op::spring*L*(1.0/6.0)
+                *vec_op::cross_2(
+                    (
+                        hlist[i]*(iscorner[(i+1)%ti]-AfixedPos)
+                        +hlist[(i+1)%ti]*(iscorner[i]-AfixedPos)
+                        +(2*hlist[i])*(iscorner[i]-AfixedPos)
+                        +(2*hlist[(i+1)%ti])*(iscorner[(i+1)%ti]-AfixedPos)
+                    ),nn);
+
+            Bm_Ns+=phy_op::spring*L*(1.0/6.0)
+                *vec_op::cross_2(
+                    (
+                        hlist[i]*(iscorner[(i+1)%ti]-BfixedPos)
+                        +hlist[(i+1)%ti]*(iscorner[i]-BfixedPos)
+                        +(2*hlist[i])*(iscorner[i]-BfixedPos)
+                        +(2*hlist[(i+1)%ti])*(iscorner[(i+1)%ti]-BfixedPos)
+                    ),nn);
+            
+            std::vector<double>f_Nd_sub=phy_op::dumper*L*(0.5)*(vnlist[i]+vnlist[(i+1)%ti]);
+            f_Nd=f_Nd+f_Nd_sub;
+            
+            //std::cout<<"f_N spring, dumper : "<<f_Ns_sub[0]<<" "<<f_Ns_sub[1]<<" "<<f_Nd_sub[0]<<" "<<f_Nd_sub[1]<<std::endl;
+            
+            f_Nlist.push_back(f_Ns_sub+f_Nd_sub);
+
+            Am_Nd+=phy_op::dumper*L*(1.0/6.0)
+                *(
+                    vec_op::cross_2((iscorner[(i+1)%ti]-AfixedPos),vlist[i])
+                    +vec_op::cross_2((iscorner[i]-AfixedPos),vlist[(i+1)%ti])
+                    +2.0*vec_op::cross_2((iscorner[i]-AfixedPos),vlist[i])
+                    +2.0*vec_op::cross_2((iscorner[(i+1)%ti]-AfixedPos),vlist[(i+1)%ti])
+                );
+
+            Bm_Nd+=phy_op::dumper*L*(1.0/6.0)
+                *(
+                    vec_op::cross_2((iscorner[(i+1)%ti]-BfixedPos),vlist[i])
+                    +vec_op::cross_2((iscorner[i]-BfixedPos),vlist[(i+1)%ti])
+                    +2.0*vec_op::cross_2((iscorner[i]-BfixedPos),vlist[i])
+                    +2.0*vec_op::cross_2((iscorner[(i+1)%ti]-BfixedPos),vlist[(i+1)%ti])
+                );
+
+        }
+
+	//friction
+        for(int i=0;i<ti;i++){
+            double L=vec_op::norm(iscorner[(i+1)%ti]-iscorner[i]);
+            if(vec_op::norm(vtlist[i])!=0&&vec_op::norm(vtlist[(i+1)%ti])!=0){
+                std::vector<double> f_D_sub=L*getdfc()*(*B).getdfc()*(0.5)*(
+                    (vec_op::norm(f_Nlist[i])/vec_op::norm(vtlist[i]))*vtlist[i]
+                    +(vec_op::norm(f_Nlist[(i+1)%ti])/vec_op::norm(vtlist[(i+1)%ti]))*vtlist[(i+1)%ti]);
+                f_D=f_D+f_D_sub;
+                f_Dlist.push_back(f_D_sub);
+
+            }else{
+                f_Dlist.push_back({0.0,0.0});
+            }
+        }
+	
+        //for(int i=0;i<ti;i++){
+        //    std::cout<<i<<" th f_Dlist : "<<f_Dlist[i][0]<<" "<<f_Dlist[i][1]<<std::endl;
+        //}
+        for(int i=0;i<ti;i++){
+            double L=vec_op::norm(iscorner[(i+1)%ti]-iscorner[i]);
+            Am_D+=L*(1.0/6.0)*(
+                vec_op::cross_2((iscorner[(i+1)%ti]-AfixedPos),f_Dlist[i])
+                +vec_op::cross_2((iscorner[i]-AfixedPos),f_Dlist[(i+1)%ti])
+                +(2.0)*vec_op::cross_2((iscorner[i]-AfixedPos),f_Dlist[i])
+                +(2.0)*vec_op::cross_2((iscorner[(i+1)%ti]-AfixedPos),f_Dlist[(i+1)%ti])
+            );
+
+            Bm_D+=L*(1.0/6.0)*(
+                vec_op::cross_2((iscorner[(i+1)%ti]-BfixedPos),f_Dlist[i])
+                +vec_op::cross_2((iscorner[i]-BfixedPos),f_Dlist[(i+1)%ti])
+                +(2.0)*vec_op::cross_2((iscorner[i]-BfixedPos),f_Dlist[i])
+                +(2.0)*vec_op::cross_2((iscorner[(i+1)%ti]-BfixedPos),f_Dlist[(i+1)%ti])
+            );
+
+        }
+
+        
+        //std::cout<<"f_Ns,f_Nd,f_D"<<std::endl;
+        //for(int i=0;i<2;i++){
+        //    std::cout<<f_Ns[i]<<" "<<f_Nd[i]<<" "<<f_D[i]<<std::endl;
+        //}
+        //std::cout<<"Am_Ns,Am_Nd,Am_D : "<<Am_Ns<<" "<<Am_Nd<<" "<<Am_D<<std::endl;
+        //std::cout<<"Bm_Ns,Bm_Nd,Bm_D : "<<Bm_Ns<<" "<<Bm_Nd<<" "<<Bm_D<<" "<<std::endl;
+       
+        //update V,W
+        //速度に上限を設定　根本的な解決ではない
+        double th_f,th_m;
+        th_f=1.0;th_m=0.1;
+        if(vec_op::norm(f_Ns)>th_f){
+            f_Ns=(th_f/vec_op::norm(f_Ns))*f_Ns;
+        }
+        if(vec_op::norm(f_Nd)>th_f){
+            f_Nd=(th_f/vec_op::norm(f_Nd))*f_Nd;
+        }
+        if(vec_op::norm(f_D)>th_f){
+            f_D=(th_f/vec_op::norm(f_D))*f_D;
+        }
+
+        if(abs(Am_Ns)>th_m){
+            Am_Ns=(th_m/abs(Am_Ns))*Am_Ns;
+        }
+        if(abs(Am_Nd)>th_m){
+            Am_Nd=(th_m/abs(Am_Nd))*Am_Nd;
+        }
+        if(abs(Am_D)>th_m){
+            Am_D=(th_m/abs(Am_D))*Am_D;
+        }
+
+        if(abs(Bm_Ns)>th_m){
+            Bm_Ns=(th_m/abs(Bm_Ns))*Bm_Ns;
+        }
+        if(abs(Bm_Nd)>th_m){
+            Bm_Nd=(th_m/abs(Bm_Nd))*Bm_Nd;
+        }
+        if(abs(Bm_D)>th_m){
+            Bm_D=(th_m/abs(Bm_D))*Bm_D;
+        }
+
+
+
+
+        if(!getstop()){//&&getmotion()){//&&bbb==0
+            //std::cout<<"A VW is updated."<<std::endl;
             if(!getjoint()){
-                setV(getV()-(Q/getM())*nn-(vec_op::dot(getV(),hh)*getdfc()/vec_op::norm(getV()))*hh);
+                setV(getV()-(Q/getM())*nn-(1.0/getM())*(f_Ns+f_Nd+f_D));
             }
-            setW(getW()-(Q/getI())*vec_op::cross_2(ra,nn));
+            setW(getW()-((Q)/getI())*vec_op::cross_2(ra,nn)-(Am_Ns+Am_Nd+Am_D)/getI());
 
         }
 
-        if(!(*B).getstop()&&bbb==0){
+        if(!(*B).getstop()){//&&(*B).getmotion()){
+            //std::cout<<"B VW is updated."<<std::endl;
             if(!(*B).getjoint()){
-                (*B).setV((*B).getV()+(Q/(*B).getM())*nn+(vec_op::dot((*B).getV(),hh)*(*B).getdfc()/vec_op::norm((*B).getV()))*hh);
+                (*B).setV((*B).getV()+(Q/(*B).getM())*nn+(1.0/(*B).getM())*(f_Ns+f_Nd+f_D));
             }
-            (*B).setW((*B).getW()+(Q/(*B).getI())*vec_op::cross_2(rb,nn));
+            (*B).setW((*B).getW()+((Q)/(*B).getI())*vec_op::cross_2(rb,nn)+(Bm_Ns+Bm_Nd+Bm_D)/(*B).getI());
 
         }
+        
+        if(!getstop()&&!getjoint()){
+            shiftColPos((0.5)*force);
+        }
+        if(!(*B).getstop()&&!(*B).getjoint()){
+            (*B).shiftColPos((-0.5)*force);
+        }
 
+        //std::cout<<"after : "<<std::endl;
         //std::cout<<"A Pos : "<<getG()[0]<<" "<<getG()[1]<<std::endl;
         //std::cout<<"B Pos : "<<(*B).getG()[0]<<" "<<(*B).getG()[1]<<std::endl;
         //std::cout<<"A V x,y : "<<getV()[0]<<" "<<getV()[1]<<std::endl;
@@ -1027,6 +1435,162 @@ void Triangle::Collision(Triangle *B){
         //std::cout<<"B V x,y : "<<(*B).getV()[0]<<" "<<(*B).getV()[1]<<std::endl;
         //std::cout<<"B W : "<<(*B).getW()<<" "<<std::endl;
         
+        std::vector<double> AdV=-(Q/getM())*nn-(1.0/getM())*(f_Ns+f_Nd+f_D);
+        double AdW=-((Q)/getI())*vec_op::cross_2(ra,nn)-(Am_Ns+Am_Nd+Am_D)/getI();
+        std::vector<double> BdV=(Q/(*B).getM())*nn+(1.0/(*B).getM())*(f_Ns+f_Nd+f_D);
+        double BdW=((Q)/(*B).getI())*vec_op::cross_2(ra,nn)+(Am_Ns+Am_Nd+Am_D)/(*B).getI();
+        
+        //set r,th
+        if(!getmotion()){
+            setr_s(getr_s()+AdV);
+            setth_s(getth_s()+AdW);
+        }
+        if(!(*B).getmotion()){
+            (*B).setr_s((*B).getr_s()+BdV);
+            (*B).setth_s((*B).getth_s()+BdW);
+        }
+
+        //std::cout<<"A r_s,th_s : "<<getr_s()[0]<<" "<<getr_s()[1]<<" "<<getth_s()<<std::endl;
+        //std::cout<<"B r_s,th_s : "<<(*B).getr_s()[0]<<" "<<(*B).getr_s()[1]<<" "<<(*B).getth_s()<<std::endl;
+
+        //静止摩擦力
+        for(int i=0;i<ti;i++){
+            double L=vec_op::norm(iscorner[i]-iscorner[(i+1)%ti]);
+            std::vector<double> f_Ss_sub=-phy_op::Sspring*L*(
+                getr_s()+getth_s()*(0.5)*vec_op::rot_2(CV::PI/2,(iscorner[i]+iscorner[(i+1)%ti]-2.0*AfixedPos))
+                -((*B).getr_s()+(*B).getth_s()*(0.5)*vec_op::rot_2(CV::PI/2,(iscorner[i]+iscorner[(i+1)%ti]-2.0*BfixedPos))));
+            f_Ss=f_Ss+f_Ss_sub;
+            //remember moment
+            Am_Ss=-phy_op::Sspring*L*(
+                vec_op::cross_2(getr_s(),(0.5*(iscorner[i]+iscorner[(i+1)%ti])-AfixedPos))
+                +getth_s()/3.0*(
+                    vec_op::dot(iscorner[i]-AfixedPos,iscorner[i]-AfixedPos)
+                    +vec_op::dot(iscorner[i]-AfixedPos,iscorner[(i+1)%ti]-AfixedPos)
+                    +vec_op::dot(iscorner[(i+1)%ti]-AfixedPos,iscorner[(i+1)%ti]-AfixedPos)
+                )
+            );
+            
+            Bm_Ss=-phy_op::Sspring*L*(
+                vec_op::cross_2((*B).getr_s(),(0.5*(iscorner[i]+iscorner[(i+1)%ti])-BfixedPos))
+                +(*B).getth_s()/3.0*(
+                    vec_op::dot(iscorner[i]-BfixedPos,iscorner[i]-BfixedPos)
+                    +vec_op::dot(iscorner[i]-BfixedPos,iscorner[(i+1)%ti]-BfixedPos)
+                    +vec_op::dot(iscorner[(i+1)%ti]-BfixedPos,iscorner[(i+1)%ti]-BfixedPos)
+                )
+            );
+
+                        
+            std::vector<double> f_Sd_sub=-phy_op::Sdumper*L*(
+                AdV+AdW*(0.5)*vec_op::rot_2(CV::PI/2,(iscorner[i]+iscorner[(i+1)%ti]-2.0*AfixedPos))
+                -(BdV+BdW*(0.5)*vec_op::rot_2(CV::PI/2,(iscorner[i]+iscorner[(i+1)%ti]-2.0*BfixedPos))));
+            f_Sd=f_Sd+f_Sd_sub;
+            
+            Am_Sd=-phy_op::Sdumper*L*(
+                vec_op::cross_2((0.5*(vlist[i]+vlist[(i+1)%ti])),(0.5*(iscorner[i]+iscorner[(i+1)%ti])-AfixedPos))
+                +AdW/3.0*(
+                    vec_op::dot(iscorner[i]-AfixedPos,iscorner[i]-AfixedPos)
+                    +vec_op::dot(iscorner[i]-AfixedPos,iscorner[(i+1)%ti]-AfixedPos)
+                    +vec_op::dot(iscorner[(i+1)%ti]-AfixedPos,iscorner[(i+1)%ti]-AfixedPos)
+                   
+                )
+            );
+
+            Bm_Sd=-phy_op::Sdumper*L*(
+                vec_op::cross_2((0.5*(vlist[i]+vlist[(i+1)%ti])),(0.5*(iscorner[i]+iscorner[(i+1)%ti])-BfixedPos))
+                +BdW/3.0*(
+                    vec_op::dot(iscorner[i]-BfixedPos,iscorner[i]-BfixedPos)
+                    +vec_op::dot(iscorner[i]-BfixedPos,iscorner[(i+1)%ti]-BfixedPos)
+                    +vec_op::dot(iscorner[(i+1)%ti]-BfixedPos,iscorner[(i+1)%ti]-BfixedPos)
+                   
+                )
+            );
+
+            f_Slist.push_back(f_Ss_sub+f_Sd_sub);
+        }
+
+        
+        for(int i=0;i<ti;i++){
+            double L=vec_op::norm(iscorner[i]-iscorner[(i+1)%ti]);
+            if(vec_op::norm(f_Slist[i])!=0.0&&vec_op::norm(f_Slist[(i+1)%ti])!=0.0){
+                f_M=f_M+L*getsfc()*(*B).getsfc()*(0.5)*(
+                    (vec_op::norm(f_Nlist[i])/vec_op::norm(f_Slist[i]))*f_Slist[i]
+                    +(vec_op::norm(f_Nlist[(i+1)%ti])/vec_op::norm(f_Slist[(i+1)%ti]))*f_Slist[(i+1)%ti]);
+            }
+        }
+
+        //std::cout<<"f_S,f_D,f_M : "<<std::endl;
+        //std::cout<<f_Ss[0]+f_Sd[0]<<" "<<f_Ss[1]+f_Sd[1]<<" "<<f_D[0]<<" "<<f_D[1]<<" "<<f_M[0]<<" "<<f_M[1]<<std::endl;
+        //std::cout<<"Am_D,Am_Ss,Am_Sd,Am_M : "<<Am_D<<" "<<Am_Ss<<" "<<Am_Sd<<" "<<Am_M<<std::endl; 
+        //std::cout<<"Bm_D,Bm_Ss,Bm_Sd,Bm_M : "<<Bm_D<<" "<<Bm_Ss<<" "<<Bm_Sd<<" "<<Bm_M<<std::endl; 
+        
+        //状態遷移 motion<--->static
+        if(getmotion()){
+            //motion->static
+            //std::cout<<"A motion to static"<<std::endl;
+            if(vec_op::norm(f_Ss+f_Sd)>vec_op::norm(f_D)
+                &&(abs(Am_Ss+Am_Sd)>abs(Am_D))
+                //&&vec_op::norm(AdV)<0.1
+                //&&abs(AdW)<0.01
+            ){
+                if(!getjoint()){
+                    //setmotion(0);
+                    //std::cout<<"A setmotion 0"<<std::endl;
+                }else{
+                    if(abs(vec_op::cross_2(getG()-getfix(),GV.getG()))<1.0){
+                        setmotion(0);
+                        //std::cout<<"A with joint setmotion 0"<<std::endl;
+                    }
+                }
+                
+            }
+        }else{
+            //static->motion
+            //std::cout<<"A static to motion"<<std::endl;
+            if((vec_op::norm(f_Ss+f_Sd)>vec_op::norm(f_M))
+                ||(abs(Am_Ss+Am_Sd)>=abs(Am_M))){
+            //){
+                setmotion(1);
+                setr_s({0.0,0.0});
+                setth_s(0.0);
+            }
+        }
+        if((*B).getmotion()){
+            //motion->static
+            //std::cout<<"B motion to static"<<std::endl;
+            if(vec_op::norm(f_Ss+f_Sd)>vec_op::norm(f_D)
+                &&(abs(Bm_Ss+Bm_Sd)>abs(Bm_D))
+                //&&vec_op::norm(BdV)<0.1
+                //&&abs(BdW)<0.01
+            ){
+                //remember 
+                //安定化のタイミング　要修正　モーメントの式がおかしい？        
+		    
+                if(!(*B).getjoint()){
+                    //(*B).setmotion(0);
+                    //std::cout<<"B setmotion 0"<<std::endl;
+                }else{
+                    if(abs(vec_op::cross_2((*B).getG()-(*B).getfix(),GV.getG()))<1.0){
+                        (*B).setmotion(0);
+                        //std::cout<<"B with joint setmotion 0"<<std::endl;
+                    }
+                }
+
+
+            }
+        }else{
+            //static->motion
+            //std::cout<<"B static to motion"<<std::endl;
+            if((vec_op::norm(f_Ss+f_Sd)>vec_op::norm(f_M))
+                ||(abs(Bm_Ss+Bm_Sd)>abs(Bm_M))){
+            //){
+                (*B).setmotion(1);
+                (*B).setr_s({0.0,0.0});
+                (*B).setth_s(0.0);
+            }
+        }
+        
+       //std::cout<<"motion : "<<getmotion()<<" "<<(*B).getmotion()<<std::endl;
+      
         if(getstop()){
             PosUpdate(1.0);
             if(bbb==0){
@@ -1041,7 +1605,7 @@ void Triangle::Collision(Triangle *B){
         }
     }
 
-    std::cout<<"GJK is over..."<<std::endl<<std::endl;
+    //std::cout<<"GJK is over..."<<std::endl;
     //return goEPAFlag;
 }
 
@@ -1066,23 +1630,46 @@ while(true){
     return;
 }
 
+namespace test{
+    Triangle player=Triangle({{0,100},{40,100},{20,60}},1,0.5,0.2,0.1,0,{0,0});
+    std::vector<Triangle> testlist;//={test::player,testA,testB,testC,floor};
+    std::vector<std::vector<cv::Point>> plistlist;//={plistP,plistA,plistB,plistC,plistf};
+
+    Triangle * player_ptr;
+
+    void whereamI(){
+        //std::cout<<"player x,y : "<<player.getG()[0]<<" "<<player.getG()[1]<<std::endl;
+    }
+}
+
+
+
 void gamedisplay(){
 	GV.setframeFlag(false);
-
-    Triangle testA=Triangle({{50,0},{150,0},{50,100}},1,0.5,2,1,0,{0,0});
+	
+    //編集　ここから 
+    Triangle testA=Triangle({{50,0},{150,0},{50,100}},1,1.0,0.2,0.1,0,{0,0});
     testA.addJoint({50,0});
 
-    Triangle testB=Triangle({{0,0},{100,-100},{0,-100}},1,0.5,2,1,-0.1,{0,-5});
-    Triangle testC=Triangle({{100,-200},{100,-300},{0,-300}},1,0.5,2,1,0.1,{0,-3});
-    Triangle floor=Triangle({{200,150},{-200,150},{0,200}},1,0.5,2,1,0,{0,0});
+    Triangle testB=Triangle({{50,-100},{100,-150},{50,-150}},1,1.0,0.2,0.1,0.1,{1,-1});
+    Triangle testC=Triangle({{-50,100},{-50,50},{-100,50}},1,1.0,0.2,0.1,0.1,{0,-3});
+    testC.addJoint({-100,50});
+    Triangle floor=Triangle({{500,150},{-500,150},{0,200}},1,1.0,0.2,0.1,0,{0,0});
     //testA.setstop(1);
-    //testB.setstop(1);
-    testC.setstop(1);
+    testB.setstop(1);
+    //testC.setstop(1);
     floor.setstop(1);
-    std::vector<Triangle> testlist={testA,testB,testC,floor};
+    
+    //編集ここまで
 
-    std::vector<cv::Point> plistA,plistB,plistC,plistf;
+    std::vector<cv::Point> plistP,plistA,plistB,plistC,plistf;
     for(int i=0;i<4;i++){
+        plistP.push_back(
+            cv::Point(
+                (int)(GV.getCW()/2+test::player.getcorner()[i%3][0]+test::player.getG()[0]),
+                (int)(GV.getCH()/2+test::player.getcorner()[i%3][1]+test::player.getG()[1])
+            )
+        );
         plistA.push_back(
             cv::Point(
                 (int)(GV.getCW()/2+testA.getcorner()[i%3][0]+testA.getG()[0]),
@@ -1109,13 +1696,19 @@ void gamedisplay(){
         );
     }
 
-    std::vector<std::vector<cv::Point>> plistlist={plistA,plistB,plistC,plistf};
+    
+    std::vector<Triangle> testlist={test::player,testA,testB,testC,floor};
+    std::vector<std::vector<cv::Point>> plistlist={plistP,plistA,plistB,plistC,plistf};
+
+    test::player_ptr=&(testlist[0]);
+
  
 while(1){
+
     cv::Mat img(cv::Size(GV.getCW(),GV.getCH()),CV_8UC3,cv::Scalar(0,0,0));
     
     for(int i=0;i<testlist.size();i++){
-        if(!testlist[i].getstop()){
+        if(!testlist[i].getstop()&&testlist[i].getmotion()){
             if(!testlist[i].getjoint()){
                 testlist[i].update();
             }else{
@@ -1129,8 +1722,8 @@ while(1){
     for(int i=0;i<testlist.size();i++){
         for(int j=i+1;j<testlist.size();j++){          
             if(testlist[i].AABB(&(testlist[j]))){
-                std::cout<<"-----------------------------------"<<i<<" vs "<<j<<" Collision-----------------------------"<<std::endl;
-                testlist[i].Collision(&(testlist[j]));
+                //std::cout<<"-----------------------------------"<<i<<" vs "<<j<<" Collision-----------------------------"<<std::endl;
+                testlist[i].Contact(&(testlist[j]));
             }            
         }
     }
@@ -1156,10 +1749,11 @@ while(1){
 
     
     for(int i=0;i<plistlist.size();i++){
-        cv::polylines(img,plistlist[i],true,cv::Scalar(0xff,0,0xff));
+        cv::Scalar color=i==0?cv::Scalar(0xff,0xff,0xff):cv::Scalar(0xff,0,0xff);
+        cv::polylines(img,plistlist[i],true,color);
     }
 
-    cv::imshow("test",img);
+    cv::imshow("test window",img);
     //cv::waitKey(0);
     img.release();
     
@@ -1175,13 +1769,42 @@ while(1){
     return;
 }
 
+
+
+
+
+
+
+
+void keyEvent(){
+    const unsigned short MSB=0x8000;
+    while(1){
+        if(GetAsyncKeyState(VK_LEFT)&MSB){
+            //std::cout<<"LEFT KEY IS PRESSED."<<std::endl;
+            (*(test::player_ptr)).setV((*(test::player_ptr)).getV()-(std::vector<double>){1.0,0.0});
+        }
+        if(GetAsyncKeyState(VK_RIGHT)&MSB){
+            //std::cout<<"RIGHT KEY IS PRESSED."<<std::endl;
+            (*(test::player_ptr)).setV((*(test::player_ptr)).getV()+(std::vector<double>){1.0,0.0});
+        }
+        if(GetAsyncKeyState(VK_SPACE)&MSB){
+            //std::cout<<"SPACE KEY IS PRESSED."<<std::endl;
+            (*(test::player_ptr)).setV((*(test::player_ptr)).getV()+(std::vector<double>){0.0,-5.0});
+        }
+        //test::whereamI();
+        Sleep(GV.getspf());
+    }
+}
+
 int main(){
     
     std::thread th_main(gamedisplay);
     std::thread th_frame(frameManager);
+    std::thread th_keyEvent(keyEvent);
 
     th_main.join();
     th_frame.join();
+    th_keyEvent.join();
 
         
     return 0;
