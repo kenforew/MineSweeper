@@ -10,6 +10,11 @@
 #include "mat_op.hpp"
 
 namespace phy_op{
+	double spring=0.02;
+	double dumper=0.01;
+	double Sspring=0.04;
+    double Sdumper=0.02;
+
     template<class T>
         std::vector<std::vector<T>> I(const std::vector<T>&v1,std::vector<T>&v2,std::vector<T>&v3,const T &m){
             std::vector<std::vector<T>>vlist={v1,v2,v3};
