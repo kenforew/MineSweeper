@@ -296,11 +296,15 @@ public:
     double distLineSegment(std::vector<double>,std::vector<double>,std::vector<double>);
     double signedDistLine(std::vector<double>,std::vector<double>,std::vector<double>);
     std::vector<double> getNVector(std::vector<double>,std::vector<double>,std::vector<double>);
+    bool is_inTriangle(std::vector<double>,std::vector<double>,std::vector<double>,std::vector<double>);
+
     std::vector<double> GJK_EPA_force(Triangle *);
     void Contact(Triangle *);
     void addJoint(std::vector<double>);
     void removeJoint();
-
+    
+    std::vector<std::vector<double>> Quickhull_2D(std::vector<std::vector<double>>);
+    void Quickhull_2D_sub(std::vector<std::vector<double>> *,std::vector<std::vector<double>>,std::vector<double>,std::vector<double>);
 };
 
 void Triangle::VWUpdate(double ratio){
@@ -486,6 +490,30 @@ std::vector<double> Triangle::getNVector(std::vector<double> p1,std::vector<doub
     std::vector<double> ans=p1+t*dv;
     return ans-q;
 }
+bool Triangle::is_inTriangle(std::vector<double> p1,std::vector<double> p2,std::vector<double> p3,std::vector<double> q){
+    std::int8_t sgn=1;
+    if(vec_op::cross_2(
+        p2-p1,p3-p1
+    )>0){
+        sgn*=(-1);
+    }
+    bool flag=true;
+    if(sgn*vec_op::cross_2(q-p1,p2-p1)<=0.0){
+        std::cout<<"1st judge"<<std::endl;
+        flag=flag&&false;
+    }
+    if(sgn*vec_op::cross_2(q-p2,p3-p2)<=0.0){
+        std::cout<<"2nd judge"<<std::endl;
+        flag=flag&&false;
+    }
+    if(sgn*vec_op::cross_2(q-p3,p1-p3)<=0.0){
+        std::cout<<"3rd judge"<<std::endl;
+        flag=flag&&false;
+    }
+
+    return flag;
+}
+
 
 std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
     //std::cout<<"GJK EPA force is called."<<std::endl;
@@ -919,7 +947,6 @@ std::vector<double> Triangle::GJK_EPA_force(Triangle *B){
 void Triangle::Contact(Triangle *B){
     //cout<<"GJK reffers the address : "<<B<<endl;
     std::vector<double> collision,nearestDot,force={0.0,0.0};
-    bool vwHasChanged=false;
     std::vector<std::vector<double>>Qnlist,ralist,rblist;
     
     for(int bbb=0;bbb<1;bbb++){
@@ -1073,7 +1100,6 @@ void Triangle::Contact(Triangle *B){
         Q=(1+getE()*(*B).getE())*(v_ab[0]*nn[0]+v_ab[1]*nn[1])/(1/getM()+1/(*B).getM()+a+b);
 
         //add Spring and dumper to Q
-        phy_op::spring;
         std::vector<double> NDtoG;
         if(x=='a'){
             NDtoG=(*B).getG()-(nearestDot+collision);
@@ -1136,57 +1162,21 @@ void Triangle::Contact(Triangle *B){
         //    std::cout<<i<<" th convexlist element : "<<convexlist[i][0]<<" "<<convexlist[i][1]<<std::endl;
         //}
 
+        //std::vector<std::vector<double>> test={
+        //    {0,100},{100,-50},{-100,-50},{20,0},{-20,10},{30,-30}
+        //};
+        //test=Quickhull_2D(test);
 
-        int maxindex=0;
-        double maxX=convexlist[0][0];
-        for(int i=1;i<convexlist.size();i++){
-            if(maxX<convexlist[i][0]){
-                maxX=convexlist[i][0];
-                maxindex=i;
-            }
-        }
-
-        //std::cout<<"maxindex: "<<maxindex<<std::endl;
-        std::vector<std::vector<double>> minconvexlist;
-        std::vector<int> minconvexindexlist;
-        minconvexlist.push_back(convexlist[maxindex]);
-        minconvexindexlist.push_back(maxindex);
-        std::vector<double> branch=minconvexlist[0];
-        int minconvexindex=maxindex;
-        bool loop=true;
-
-        while(loop){
-            for(int j=0;j<convexlist.size();j++){
-                if(j!=minconvexindex){
-                    bool flag=true;
-                    for(int k=0;k<convexlist.size();k++){
-                        if(j!=k&&vec_op::cross_2(convexlist[j]-branch,convexlist[k]-branch)<0){                        
-                            flag=false;
-                            //外積負の点が一つでもあればそこで強制終了
-                            break;
-                        }
-                    }
-                    if(flag){
-                        if(convexlist[j][0]==minconvexlist[0][0]&&convexlist[j][1]==minconvexlist[0][1]){
-                            //reach first node 
-                            loop=false;
-                            break;
-                        }else{
-                            minconvexlist.push_back(convexlist[j]);
-                            minconvexindex=j;
-                            //std::cout<<"new convexlist : "<<convexlist[j][0]<<" "<<convexlist[j][1]<<std::endl;
-                            branch=convexlist[j];
-                            //std::cout<<"minconvexindex : "<<minconvexindex<<std::endl;
-                        }
-                    }
-                }
-            }
-        }        
+        //for(int i=0;i<test.size();i++){
+        //    std::cout<<"Quickhull test : "<<test[i][0]<<" "<<test[i][1]<<std::endl;
+        //}
+        
+        std::vector<std::vector<double>> minconvexlist=Quickhull_2D(convexlist);
         
         //for(int i=0;i<minconvexlist.size();i++){
-        //    std::cout<<i<<" th minconvexlist : "<<minconvexlist[i][0]<<" "<<minconvexlist[i][1]<<std::endl;
+        //    std::cout<<i<<" th minconvexlist element : "<<minconvexlist[i][0]<<" "<<minconvexlist[i][1]<<std::endl;
         //}
-
+       
         std::vector<std::vector<double>> intersection;
         int tc=minconvexlist.size();
         for(int i=0;i<tc;i++){
@@ -1206,9 +1196,9 @@ void Triangle::Contact(Triangle *B){
             }
         }
         
-        //for(int i=0;i<intersection.size();i++){
-        //    std::cout<<"intersection : "<<intersection[i][0]<<" "<<intersection[i][1]<<std::endl;
-        //}
+        for(int i=0;i<intersection.size();i++){
+            std::cout<<"intersection : "<<intersection[i][0]<<" "<<intersection[i][1]<<std::endl;
+        }
 
         std::vector<std::vector<double>> iscorner;
         int ti=intersection.size();
@@ -1621,6 +1611,116 @@ void Triangle::removeJoint(){
     delete &fix;
 }
 
+void removePointsInTriangle(std::vector<std::vector<double>> * ptr){
+
+}
+
+std::vector<std::vector<double>> Triangle::Quickhull_2D(std::vector<std::vector<double>> points){
+    std::vector<std::vector<double>> ans;
+    int minindex=0,maxindex=0;
+    double minX=points[0][0],maxX=points[0][0];
+    for(int i=0;i<points.size();i++){
+        if(minX>points[i][0]){
+            minindex=i;
+            minX=points[i][0];
+        }
+        if(maxX<points[i][0]){
+            maxindex=i;
+            maxX=points[i][0];
+        }
+    }
+
+    ans.push_back(points[minindex]);
+    ans.push_back(points[maxindex]);
+    //for(int i=0;i<ans.size();i++){
+    //    std::cout<<"init ans : "<<ans[i][0]<<" "<<ans[i][1]<<std::endl;
+    //}
+    
+    std::vector<std::vector<double>> set1,set2;
+
+    for(int i=0;i<points.size();i++){
+        if(i!=minindex&&i!=maxindex){
+            if(vec_op::cross_2(
+                (points[maxindex]-points[minindex]),
+                (points[i]-points[minindex])
+            )>0){
+                set1.push_back(points[i]);
+            }else{
+                set2.push_back(points[i]);
+            }
+        }
+    }    
+    std::cout<<"init set size : "<<set1.size()<<" "<<set2.size()<<std::endl;
+
+    if(set1.size()!=0)Quickhull_2D_sub(&(ans),set1,points[minindex],points[maxindex]);
+    if(set2.size()!=0)Quickhull_2D_sub(&(ans),set2,points[maxindex],points[minindex]);
+
+    return ans;
+
+}
+
+void Triangle::Quickhull_2D_sub(std::vector<std::vector<double>> *ans_ptr,std::vector<std::vector<double>> set,std::vector<double> p1,std::vector<double> p2){
+    std::cout<<"Quickhull loop is called.-------------------"<<std::endl;
+	int furtherId=0;
+    double len=0;
+    for(int i=0;i<set.size();i++){
+        if(len<distLine(p1,p2,(std::vector<double>)set[i])){
+            furtherId=i;
+            len=distLine(p1,p2,(std::vector<double>)set[i]);
+        }
+    }
+    std::vector<double> head=set[furtherId];
+    std::vector<double> foot=getNVector(p1,p2,head);
+    
+    std::cout<<"head,foot : "<<head[0]<<" "<<head[1]<<" "<<foot[0]<<" "<<foot[1]<<std::endl;
+
+    (*ans_ptr).push_back(head);
+    
+    for(int i=0;i<(*ans_ptr).size();i++){
+        std::cout<<i<<" th element of ans : "<<(*ans_ptr)[i][0]<<" "<<(*ans_ptr)[i][1]<<std::endl;
+    }
+
+    std::vector<std::vector<double>>set1,set2,set1_sub,set2_sub;
+    for(int i=0;i<set.size();i++){
+        if(vec_op::cross_2(
+            (-1.0)*foot,
+            set[i]-(head+foot)
+        )>0){
+            set1.push_back(set[i]);
+        }else if(vec_op::cross_2(
+            (-1.0)*foot,
+            set[i]-(head+foot)
+        )<0){
+            set2.push_back(set[i]);
+        }
+    }
+
+    std::cout<<"set1,set2 size : "<<set1.size()<<" "<<set2.size()<<std::endl;
+
+    for(int i=0;i<set1.size();i++){
+        std::cout<<"set1 : "<<set1[i][0]<<" "<<set1[i][1]<<std::endl;
+        if(!is_inTriangle(
+            p1,head,(head+foot),set1[i]
+        )){
+            set1_sub.push_back(set1[i]);
+        }
+    }
+    for(int i=0;i<set2.size();i++){
+        std::cout<<"set2 : "<<set2[i][0]<<" "<<set2[i][1]<<std::endl;
+        if(!is_inTriangle(
+            p2,head,(head+foot),set2[i]
+        )){
+            set2_sub.push_back(set2[i]);
+        }
+    }
+
+    std::cout<<"set1_sub,set2_sub size : "<<set1_sub.size()<<" "<<set2_sub.size()<<std::endl;
+    
+    if(set1_sub.size()!=0)Quickhull_2D_sub(ans_ptr,set1_sub,p1,head);
+    if(set2_sub.size()!=0)Quickhull_2D_sub(ans_ptr,set2_sub,head,p2);    
+    return;
+}
+
 
 void frameManager(){
 while(true){
@@ -1657,7 +1757,7 @@ void gamedisplay(){
     Triangle floor=Triangle({{500,150},{-500,150},{0,200}},1,1.0,0.2,0.1,0,{0,0});
     //testA.setstop(1);
     testB.setstop(1);
-    //testC.setstop(1);
+    testC.setstop(1);
     floor.setstop(1);
     
     //編集ここまで
