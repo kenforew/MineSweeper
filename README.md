@@ -1,3 +1,3 @@
 # MineSweeper
 3DMinesweeper and more in C++
-useing OpenCV4.5.2
+using OpenCV4.5.2
